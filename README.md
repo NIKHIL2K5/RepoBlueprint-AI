@@ -185,8 +185,8 @@ RepoBlueprint AI guarantees 100% uptime through a flexible three-tier engine arc
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/satvik310706/repo-blueprint.git
-cd repo-blueprint
+git clone https://github.com/satvik310706/RepoBlueprint-AI.git
+cd RepoBlueprint-AI
 
 # 2. Install dependencies
 npm install
