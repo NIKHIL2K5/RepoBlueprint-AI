@@ -32,6 +32,8 @@ const STAGE_QUICK_ACTIONS = {
     { text: '🚀 Generate Master Blueprint', query: 'Everything looks good, generate the master architecture blueprint' },
   ],
   dashboard: [
+    { text: '🗄️ Switch DB to MongoDB', query: 'change the db to mongodb or oracle' },
+    { text: '🎯 Explain my idea & features', query: 'Can you explain what my idea is and what are the key features?' },
     { text: '📦 Download Starter Repo .zip', query: 'Download the starter repository zip bundle now' },
     { text: '⚙️ Explain Tech Stack choices', query: 'Explain the chosen tech stack and trade-offs' },
     { text: '💰 View Cost Calculator', query: 'Switch to the Cost Calculator tab' },
@@ -134,9 +136,11 @@ export default function CopilotDrawer({
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = selectedLang.code;
+
+      let silenceTimeout = null;
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -150,11 +154,21 @@ export default function CopilotDrawer({
         if (transcript.trim()) {
           setInputVal(transcript.trim());
         }
+        if (silenceTimeout) clearTimeout(silenceTimeout);
+        silenceTimeout = setTimeout(() => {
+          try { recognition.stop(); } catch (e) {}
+          setIsListening(false);
+        }, 2200);
       };
 
       recognition.onerror = (e) => {
         console.warn('Copilot mic error:', e.error);
-        setIsListening(false);
+        if (e.error === 'not-allowed') {
+          alert('Microphone permission blocked. Please click 🔒 in your address bar and allow microphone access.');
+          setIsListening(false);
+        } else if (e.error !== 'no-speech') {
+          setIsListening(false);
+        }
       };
 
       recognition.onend = () => {
@@ -327,6 +341,10 @@ export default function CopilotDrawer({
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
 
+    const safetyTimer = setTimeout(() => {
+      setIsThinking(false);
+    }, 9000);
+
     try {
       const res = await sendChatMessage({
         config,
@@ -377,6 +395,7 @@ export default function CopilotDrawer({
         }
       ]);
     } finally {
+      clearTimeout(safetyTimer);
       setIsThinking(false);
     }
   };
@@ -612,6 +631,12 @@ export default function CopilotDrawer({
 
               {/* Input Footer */}
               <div className="copilot-input-area">
+                {isListening && (
+                  <div className="copilot-listening-banner" style={{ fontSize: '0.8rem', color: '#ea580c', padding: '4px 10px', background: 'rgba(234, 88, 12, 0.12)', border: '1px solid rgba(234, 88, 12, 0.25)', borderRadius: '6px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 8px #ef4444' }} />
+                    <span>Listening in <strong>{selectedLang.flag} {selectedLang.native}</strong>... speak your command</span>
+                  </div>
+                )}
                 <div className="copilot-input-wrapper">
                   <input
                     type="text"

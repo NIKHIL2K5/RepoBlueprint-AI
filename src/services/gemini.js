@@ -308,7 +308,12 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
     raw.includes('screen reader') ||
     raw.includes('audio navigation') ||
     raw.includes('a11y') ||
-    raw.includes('wcag')
+    raw.includes('wcag') ||
+    raw.includes('బ్లైండ్') ||
+    raw.includes('అంధుల') ||
+    raw.includes('యాక్సెస్') ||
+    raw.includes('दृष्टिहीन') ||
+    raw.includes('सुगम')
   ) {
     return {
       projectTitle: 'VisionBridge — Voice-First Web Portal for the Blind',
@@ -385,7 +390,23 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
   }
 
   // 2. ID Cards & Document KYC
-  if (raw.includes('id') || raw.includes('card') || raw.includes('identity') || raw.includes('student') || raw.includes('badge') || raw.includes('ocr') || raw.includes('kyc') || raw.includes('license') || raw.includes('passport') || raw.includes('aadhaar')) {
+  if (
+    raw.includes('id') ||
+    raw.includes('card') ||
+    raw.includes('identity') ||
+    raw.includes('student') ||
+    raw.includes('badge') ||
+    raw.includes('ocr') ||
+    raw.includes('kyc') ||
+    raw.includes('license') ||
+    raw.includes('passport') ||
+    raw.includes('aadhaar') ||
+    raw.includes('ఐడీ') ||
+    raw.includes('కార్డ్') ||
+    raw.includes('ధృవీకరణ') ||
+    raw.includes('पहचान') ||
+    raw.includes('कार्ड')
+  ) {
     return {
       projectTitle: 'SmartID — Automated Identity & Document Verification Engine',
       oneLiner: 'AI-driven OCR extraction, biometric verification, and encrypted record store for identity cards.',
@@ -474,6 +495,14 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
     title = 'DevOps Multi-Cluster Wizard';
     oneLiner = 'Zero-downtime infrastructure orchestration and container topology manager.';
     corePurpose = 'Automates Kubernetes cluster deployments, synchronizes secret management, and monitors telemetry across hybrid clouds.';
+  } else if (raw.includes('napkin') || raw.includes('hand-drawn') || raw.includes('sketch') || raw.includes('whiteboard')) {
+    title = 'Napkin Cloud Architecture Blueprint';
+    oneLiner = 'Production full-stack cloud system synthesized directly from your whiteboard architectural sketch.';
+    corePurpose = 'Transforms hand-drawn napkin whiteboard diagrams into scalable microservices with resilient caching, relational persistence, and event-driven worker pipelines.';
+  } else if (raw.includes('హలో') || raw.includes('hello') || raw.includes('voice') || raw.includes('assistant') || raw.includes('dictat')) {
+    title = 'Voice-Enabled AI Assistant Web Portal';
+    oneLiner = 'Voice-driven conversational AI web application with multi-lingual speech recognition and audio feedback.';
+    corePurpose = 'Enables real-time voice interaction, automatic multi-language speech recognition, and natural language query processing.';
   } else if (cleaned.length > 5) {
     const words = cleaned.split(/\s+/).filter(w => !['a', 'an', 'the', 'for', 'to', 'of', 'in', 'on', 'with', 'and', 'my', 'is'].includes(w.toLowerCase())).slice(0, 4);
     title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'CloudScale Platform';

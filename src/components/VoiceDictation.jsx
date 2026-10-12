@@ -58,7 +58,7 @@ const SAMPLE_SPOKEN_IDEAS = {
   ],
 };
 
-export default function VoiceDictation({ value = '', onChange, onAppend }) {
+export default function VoiceDictation({ value = '', onChange, onAppend, onSubmit }) {
   const [selectedLang, setSelectedLang] = useState(DICTATION_LANGUAGES[0]);
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -441,6 +441,26 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
           )}
         </div>
       </div>
+
+      {/* If text is captured, provide 1-click proceed button right in VoiceDictation card */}
+      {value && value.trim().length >= 2 && (
+        <div className="voice-proceed-banner" style={{ marginTop: '12px', padding: '10px 16px', background: 'rgba(234, 88, 12, 0.12)', border: '1px solid rgba(234, 88, 12, 0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)' }}>
+            🎙️ Captured <strong>{value.trim().length} characters</strong> of spoken draft: <em style={{ color: 'var(--color-text-primary)' }}>"{value.trim().slice(0, 45)}{value.trim().length > 45 ? '…' : ''}"</em>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              if (isListening) stopListening();
+              if (onSubmit) onSubmit();
+            }}
+            style={{ padding: '7px 18px', fontSize: '0.85rem', fontWeight: '600', whiteSpace: 'nowrap' }}
+          >
+            🔬 Analyze My Blueprint →
+          </button>
+        </div>
+      )}
 
       {/* Error or Warning Banner */}
       {errorMsg && (

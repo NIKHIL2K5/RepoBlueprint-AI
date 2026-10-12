@@ -15,10 +15,13 @@ export async function sendChatMessage({ config, history = [], userMessage, appCo
   // 1. Try Ollama if configured
   if (config?.provider === 'ollama') {
     try {
-      const result = await callOllamaChat(config, systemPrompt, history, userMessage);
+      const result = await Promise.race([
+        callOllamaChat(config, systemPrompt, history, userMessage, appContext),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Ollama generation timed out (8s limit)')), 8000))
+      ]);
       return result;
     } catch (ollamaErr) {
-      console.warn('[Copilot Ollama fallback]', ollamaErr);
+      console.warn('[Copilot Ollama fallback]:', ollamaErr.message || ollamaErr);
       const fallback = generateOfflineCopilotResponse(userMessage, appContext);
       const isRemote = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
       const note = isRemote
@@ -138,16 +141,21 @@ Only provide an action tag when an action is appropriate. Make sure the action J
 }
 
 /* ──────────────── OLLAMA CHAT CALL ──────────────── */
-async function callOllamaChat(config, systemPrompt, history, userMessage) {
+async function callOllamaChat(config, systemPrompt, history, userMessage, appContext = {}) {
   const baseUrl = (config.ollamaUrl || 'http://localhost:11434').replace(/\/$/, '');
   const isLocalhost = baseUrl.includes('localhost:11434') || baseUrl.includes('127.0.0.1:11434');
   const chatUrl = isLocalhost ? '/ollama/api/chat' : `${baseUrl}/api/chat`;
   const model = config.ollamaModel || 'llama3.2:3b';
 
+  // Build compact system instructions for snappy local CPU inference
+  const stage = appContext?.stage || 'dashboard';
+  const projectTitle = appContext?.understanding?.projectTitle || 'Production System';
+  const compactSystem = `${systemPrompt.slice(0, 700)}\nCURRENT_STAGE: ${stage.toUpperCase()}\nPROJECT: "${projectTitle}"`;
+
   // Build messages array for proper multi-turn chat API
   const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.slice(-8).map(m => ({
+    { role: 'system', content: compactSystem },
+    ...history.slice(-4).map(m => ({
       role: m.role === 'user' ? 'user' : 'assistant',
       content: m.content
     })),
@@ -157,11 +165,12 @@ async function callOllamaChat(config, systemPrompt, history, userMessage) {
   const res = await fetch(chatUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(7500),
     body: JSON.stringify({
       model,
       messages,
       stream: false,
-      options: { temperature: 0.75, num_predict: 1024 }
+      options: { temperature: 0.7, num_predict: 256 }
     })
   });
 
@@ -345,6 +354,7 @@ function getDefaultActionLabel(action) {
 
 /* ──────────────── HIGH-INTELLIGENCE CONTEXTUAL FALLBACK ──────────────── */
 function generateOfflineCopilotResponse(query, appContext = {}) {
+  const stage = appContext?.stage || 'dashboard';
   const q = (query || '').toLowerCase();
   // GLOBAL: Project Renaming & Idea Updating across all stages
   const renameMatch = query.match(/(?:change|rename|set|update)\s+(?:the\s+)?(?:idea\s+name|project\s+name|project\s+title|title|name|idea)\s+(?:to\s+|as\s+|into\s+)(.+)/i);
@@ -541,16 +551,46 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
       };
     }
 
-    if (q.includes('nosql') || q.includes('mongo') || (q.includes('db') && q.includes('no')) || (q.includes('database') && q.includes('no'))) {
+    // Database switching: MongoDB, Oracle, PostgreSQL, MySQL
+    if (q.includes('oracle') && !q.includes('mongo')) {
       return {
-        text: `I have updated your architecture! Switched the primary database from PostgreSQL to **MongoDB Atlas (NoSQL)**. The live system topology diagram and tech stack specifications on your screen now reflect flexible JSON document collections and horizontal sharding.`,
+        text: `I have updated your architecture! Switched the primary persistence layer to **Oracle Autonomous Database (Cloud ATP)** with enterprise-grade ACID guarantees, automated indexing, and JSON-Relational Duality. The live system topology and tech stack specifications have been updated.`,
+        action: {
+          type: 'UPDATE_TECH_STACK',
+          params: {
+            layer: 'database',
+            name: 'Oracle Autonomous Database',
+            reason: 'Mission-critical enterprise ACID transactions, automated tuning, JSON Relational Duality, and cloud high availability.',
+            alternatives: ['PostgreSQL 16', 'MongoDB Atlas', 'Supabase'],
+            mermaidOld: 'PostgreSQL',
+            mermaidNew: 'Oracle Database (Enterprise ACID)'
+          },
+          label: '🗄️ Switch Architecture to Oracle Database'
+        }
+      };
+    }
+
+    if (
+      q.includes('mongo') ||
+      q.includes('nosql') ||
+      (q.includes('db') && q.includes('no')) ||
+      (q.includes('database') && q.includes('no')) ||
+      (q.includes('change') && q.includes('db') && (q.includes('mongo') || q.includes('oracle')))
+    ) {
+      const mentionsOracle = q.includes('oracle');
+      const text = mentionsOracle
+        ? `I have updated your architecture! Switched the primary database to **MongoDB Atlas 7.0 (NoSQL)** for flexible document schemas and high-throughput write scalability. (I also configured **Oracle Autonomous Database** in your architecture alternative options for enterprise ACID workloads). Your live system topology diagram and tech stack specifications have been updated.`
+        : `I have updated your architecture! Switched the primary database from PostgreSQL to **MongoDB Atlas (NoSQL)**. The live system topology diagram and tech stack specifications on your screen now reflect flexible JSON document collections and horizontal sharding.`;
+
+      return {
+        text,
         action: {
           type: 'UPDATE_TECH_STACK',
           params: {
             layer: 'database',
             name: 'MongoDB Atlas 7.0 (NoSQL)',
-            reason: 'Flexible JSON document schemas, rapid schema iteration without rigid migrations, and high-throughput write scalability.',
-            alternatives: ['PostgreSQL 16', 'DynamoDB', 'Supabase'],
+            reason: 'Flexible JSON document schemas, rapid schema iteration without rigid migrations, and horizontal sharding for high write throughput.',
+            alternatives: ['Oracle Autonomous Database', 'PostgreSQL 16', 'DynamoDB', 'Supabase'],
             mermaidOld: 'PostgreSQL',
             mermaidNew: 'MongoDB Atlas (NoSQL Document Store)'
           },
@@ -568,7 +608,7 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
             layer: 'database',
             name: 'PostgreSQL 16',
             reason: 'ACID transactional guarantees, relational integrity, robust indexing, and seamless pgvector AI search.',
-            alternatives: ['MongoDB Atlas', 'MySQL 8'],
+            alternatives: ['MongoDB Atlas', 'Oracle Database', 'MySQL 8'],
             mermaidOld: 'MongoDB',
             mermaidNew: 'PostgreSQL (Primary ACID)'
           },

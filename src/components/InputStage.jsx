@@ -95,7 +95,7 @@ export default function InputStage({
     onSubmit({ ideaText: combinedText, imageBase64: finalBase64, imageMime: finalMime });
   };
 
-  const canSubmit = ideaText.trim().length > 10 || (activeTab === 'sketch' && canvasBase64) || imageBase64 !== null;
+  const canSubmit = ideaText.trim().length >= 2 || (activeTab === 'sketch' && canvasBase64) || imageBase64 !== null;
 
   return (
     <div className="input-stage">
@@ -239,13 +239,14 @@ export default function InputStage({
           </div>
         )}
 
-        {/* 2. Voice Dictation Tab (NEW!) */}
+        {/* 2. Voice Dictation Tab */}
         {activeTab === 'voice' && (
           <div className="input-body animate-slide-up">
             <VoiceDictation
               value={ideaText}
               onChange={setIdeaText}
               onAppend={(newText) => setIdeaText(prev => (prev ? prev + ' ' + newText : newText))}
+              onSubmit={handleSubmit}
             />
             <div className="voice-transcript-wrapper">
               <div className="transcript-header-row">
@@ -257,8 +258,21 @@ export default function InputStage({
                 placeholder="Your spoken words will transcribe here automatically. You can also edit, format, or type additional notes..."
                 value={ideaText}
                 onChange={(e) => setIdeaText(e.target.value)}
-                rows={6}
+                rows={5}
               />
+              {ideaText.trim().length >= 2 && (
+                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSubmit}
+                    style={{ gap: '8px', padding: '10px 22px', fontWeight: '600', boxShadow: '0 4px 14px rgba(234, 88, 12, 0.3)' }}
+                  >
+                    <span>🔬 Proceed to Architecture Alignment ({ideaText.trim().length} chars)</span>
+                    <span className="btn-arrow">→</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
