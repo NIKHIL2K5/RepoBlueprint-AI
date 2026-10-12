@@ -60,21 +60,30 @@ function buildSystemPrompt(appContext = {}) {
   const stage = appContext.stage || 'input';
   let contextDetails = `CURRENT SCREEN STAGE: ${stage.toUpperCase()}\n`;
 
+  // Provide complete user idea and project understanding across all stages so the copilot always knows what the user is building!
+  if (appContext.ideaText) {
+    contextDetails += `USER'S ORIGINAL IDEA PROMPT: "${appContext.ideaText}"\n`;
+  }
+  if (appContext.understanding) {
+    contextDetails += `PROJECT TITLE: ${appContext.understanding.projectTitle || 'Untitled'}\n`;
+    contextDetails += `PROJECT ONE-LINER: ${appContext.understanding.oneLiner || ''}\n`;
+    contextDetails += `CORE PURPOSE: ${appContext.understanding.corePurpose || ''}\n`;
+    contextDetails += `TARGET USERS / ACTORS: ${(appContext.understanding.keyActors || []).join(', ')}\n`;
+    contextDetails += `CORE SYSTEM WORKFLOW: ${appContext.understanding.coreWorkflow || ''}\n`;
+    if (appContext.understanding.identifiedComponents?.length) {
+      contextDetails += `KEY ARCHITECTURE COMPONENTS: ${appContext.understanding.identifiedComponents.map(c => `${c.name} (${c.role})`).join('; ')}\n`;
+    }
+  }
+
   if (stage === 'input') {
     contextDetails += `Active Input Tab: ${appContext.inputTab || 'sketch'}\n`;
-    contextDetails += `Current Draft Text: ${appContext.ideaText ? `"${appContext.ideaText}"` : '(Empty - user has not typed an idea yet)'}\n`;
   } else if (stage === 'alignment') {
-    contextDetails += `Project Title: ${appContext.understanding?.projectTitle || 'Untitled'}\n`;
-    contextDetails += `One Liner: ${appContext.understanding?.oneLiner || ''}\n`;
-    contextDetails += `Core Purpose: ${appContext.understanding?.corePurpose || ''}\n`;
-    contextDetails += `Identified Components: ${(appContext.understanding?.identifiedComponents || []).map(c => c.name).join(', ')}\n`;
     contextDetails += `Clarifying Questions: ${JSON.stringify(appContext.understanding?.clarifyingQuestions || [])}\n`;
     contextDetails += `User Selected Answers: ${JSON.stringify(appContext.alignmentAnswers || {})}\n`;
     contextDetails += `Custom Architectural Notes: ${appContext.additionalNotes || 'None'}\n`;
   } else if (stage === 'dashboard') {
-    contextDetails += `Project Title: ${appContext.understanding?.projectTitle || 'Untitled'}\n`;
     contextDetails += `Active Dashboard Tab: ${appContext.dashboardTab || 'blueprint'}\n`;
-    contextDetails += `Tech Stack: Frontend=${appContext.blueprint?.techStack?.frontend?.name}, Backend=${appContext.blueprint?.techStack?.backend?.name}, Database=${appContext.blueprint?.techStack?.database?.name}\n`;
+    contextDetails += `Tech Stack: Frontend=${appContext.blueprint?.techStack?.frontend?.name}, Backend=${appContext.blueprint?.techStack?.backend?.name}, Database=${appContext.blueprint?.techStack?.database?.name}, AI Engine=${appContext.blueprint?.techStack?.ai?.name}\n`;
     contextDetails += `Current Cost Slider DAU: ${appContext.dau || 5000} users\n`;
     contextDetails += `Generated Files Count: ${appContext.blueprint?.fileTree?.length || 0}\n`;
   } else if (stage === 'setup') {
@@ -99,6 +108,10 @@ Be pragmatic, enthusiastic, technically rigorous, and concise (2-4 paragraphs ma
 ${langInstruction}
 LIVE APPLICATION STATE:
 ${contextDetails}
+
+CRITICAL ARCHITECTURAL CONTEXT RULE:
+When the user asks you to explain, confirm, or analyze their idea, project, or blueprint, ALWAYS refer directly to the USER'S ORIGINAL IDEA PROMPT, PROJECT TITLE, CORE PURPOSE, KEY ARCHITECTURE COMPONENTS, and INNOVATION FEATURES provided in the LIVE APPLICATION STATE above.
+NEVER say that the user has not shared their idea or that their idea is vague when it is present in the state above.
 
 YOU CAN TRIGGER EXECUTABLE ACTIONS ON THE APPLICATION:
 When you advise the user or when they ask you to do something (e.g., write an idea, answer a question, switch tabs, download repo), append an executable action tag at the very end of your response.
@@ -445,6 +458,45 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
 
   // 3. STAGE: DASHBOARD
   if (stage === 'dashboard') {
+    if (
+      q.includes('what is my idea') ||
+      q.includes('explain my idea') ||
+      q.includes('what did i tell you') ||
+      q.includes('tell me what my idea is') ||
+      q.includes('tell what my idea is') ||
+      q.includes('what my idea is') ||
+      q.includes('check the blueprint') ||
+      q.includes('explain the idea') ||
+      q.includes('key feature') ||
+      q.includes('features') ||
+      q.includes('what does this do') ||
+      q.includes('what is this project') ||
+      (q.includes('my idea') && (q.includes('what') || q.includes('tell') || q.includes('check') || q.includes('explain') || q.includes('can you')))
+    ) {
+      const idea = appContext.ideaText || appContext.understanding?.corePurpose || appContext.understanding?.oneLiner || 'your project idea';
+      const title = appContext.understanding?.projectTitle || 'Production System';
+      const purpose = appContext.understanding?.corePurpose || '';
+      const actors = (appContext.understanding?.keyActors || []).join(', ');
+      const components = (appContext.understanding?.identifiedComponents || []).map(c => `• **${c.name}**: ${c.role}`).join('\n');
+      const features = (appContext.understanding?.innovationSuggestions || []).map(f => `• **${f.title}**: ${f.description}`).join('\n');
+
+      return {
+        text: `Here is the comprehensive architectural breakdown of your idea and key features:\n\n` +
+          `🎯 **Project Title**: **${title}**\n` +
+          `📝 **Idea Description**: "${idea}"\n\n` +
+          (purpose ? `💡 **Core Purpose**: ${purpose}\n\n` : '') +
+          (actors ? `👥 **Key Target Users / Actors**: ${actors}\n\n` : '') +
+          (features ? `🚀 **Key Features & Innovation Advantages**:\n${features}\n\n` : '') +
+          (components ? `🏗️ **Key Architectural Components**:\n${components}\n\n` : '') +
+          `Would you like me to switch dashboard tabs, explain tech stack choices, or download your starter repo?`,
+        action: {
+          type: 'SWITCH_DASHBOARD_TAB',
+          params: { tab: 'blueprint' },
+          label: '🌐 View System Topology'
+        }
+      };
+    }
+
     if (q.includes('download') || q.includes('zip') || q.includes('repo') || q.includes('code')) {
       const langCode = appContext.languageCode || 'en-US';
       const text = getLocalizedSnippet('download_repo', langCode) || `Ready to start coding? I can trigger the download of your complete project .zip right now, containing working boilerplate, README.md, LICENSE, and docker-compose.yml!`;

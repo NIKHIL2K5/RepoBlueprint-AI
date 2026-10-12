@@ -88,6 +88,11 @@ export default function App() {
       if (active && active.blueprint && active.understanding) {
         setUnderstanding(active.understanding);
         setBlueprint(active.blueprint);
+        if (active.ideaText) {
+          setInputIdeaText(active.ideaText);
+        } else if (active.understanding?.rawPrompt) {
+          setInputIdeaText(active.understanding.rawPrompt);
+        }
         if (config) setAppState(STATE.DASH);
       }
     }
@@ -100,6 +105,9 @@ export default function App() {
   };
 
   const handleIdeaSubmit = async ({ ideaText, imageBase64, imageMime }) => {
+    if (ideaText) {
+      handleIdeaTextChange(ideaText);
+    }
     setAppState(STATE.LOAD1);
     setLoadingStage(0);
     setError('');
@@ -418,7 +426,7 @@ export default function App() {
   // Live context payload for Copilot
   const copilotAppContext = {
     stage: appState,
-    ideaText: inputIdeaText,
+    ideaText: inputIdeaText || understanding?.rawPrompt || understanding?.corePurpose || understanding?.oneLiner || '',
     inputTab,
     understanding,
     alignmentAnswers,

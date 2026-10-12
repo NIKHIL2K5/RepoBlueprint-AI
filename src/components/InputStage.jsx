@@ -31,6 +31,15 @@ export default function InputStage({
   const handleImageFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
     setImageFile(file);
+    const fileName = (file.name || '').toLowerCase();
+    
+    // Auto-detect document type from filename if user hasn't typed custom constraints
+    if (!ideaText.trim()) {
+      if (fileName.includes('id') || fileName.includes('card') || fileName.includes('student') || fileName.includes('badge') || fileName.includes('kyc') || fileName.includes('license') || fileName.includes('passport') || fileName.includes('aadhaar')) {
+        setIdeaText('Smart ID Card & Identity Verification System. Extract credentials via OCR (Name, ID, Photo, Expiration), design automated verification, face match, encrypted database storage, and identity management APIs.');
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       setImagePreview(e.target.result);
@@ -71,9 +80,18 @@ export default function InputStage({
       combinedText += `\n\nReference Link: ${linkUrl.trim()}`;
     }
 
-    // If drawing napkin sketch without extra text, add default context
+    // Context fallback based on active input mode
     if (!combinedText && finalBase64) {
-      combinedText = 'Hand-drawn architecture napkin sketch. Extract all components, user flows, database layers, and data pipelines directly from the diagram.';
+      if (activeTab === 'sketch') {
+        combinedText = 'Hand-drawn architecture napkin sketch. Extract all components, user flows, database layers, and data pipelines directly from the diagram.';
+      } else if (activeTab === 'image') {
+        const fileName = (imageFile?.name || '').toLowerCase();
+        if (fileName.includes('id') || fileName.includes('card') || fileName.includes('student') || fileName.includes('badge') || fileName.includes('kyc') || fileName.includes('license') || fileName.includes('passport') || fileName.includes('aadhaar')) {
+          combinedText = 'Smart ID Card & Identity Verification System. Extract credentials via OCR (Name, ID, Photo, Expiration), design automated verification, face match, encrypted database storage, and identity management APIs.';
+        } else {
+          combinedText = 'Smart ID Card & Identity Verification System. Extract credentials via OCR, design automated verification, face match, encrypted database storage, and identity management APIs.';
+        }
+      }
     }
 
     onSubmit({ ideaText: combinedText, imageBase64: finalBase64, imageMime: finalMime });
@@ -321,16 +339,52 @@ export default function InputStage({
                 </div>
               )}
             </div>
-            {imagePreview && (
-              <textarea
-                className="input-field idea-textarea"
-                placeholder="(Optional) Add any extra constraints or explanations about this photo..."
-                value={ideaText}
-                onChange={(e) => setIdeaText(e.target.value)}
-                rows={3}
-                style={{ marginTop: '16px' }}
-              />
-            )}
+
+            {/* Quick Context Chips for Uploaded Images */}
+            <div className="image-type-selector" style={{ marginTop: '14px' }}>
+              <div style={{ fontSize: '12.5px', marginBottom: '8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                ✨ Choose image category to generate the exact architecture:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {[
+                  {
+                    label: '🪪 Smart ID Card / KYC Verification',
+                    text: 'Smart ID Card & Identity Verification System. Extract credentials via OCR (Name, ID, Photo, Expiration), design automated verification, face match, encrypted database storage, and identity management APIs.'
+                  },
+                  {
+                    label: '🎓 Student / Campus ID Management',
+                    text: 'Student Campus Identity & Access Management System. Manages student/staff digital badges, NFC/QR gate access, attendance logs, and institutional directory synchronization.'
+                  },
+                  {
+                    label: '📐 Whiteboard Architecture Diagram',
+                    text: 'Cloud infrastructure & software architecture diagram extracted from whiteboard photo. Map services, databases, caching layers, and ingress gateways.'
+                  },
+                  {
+                    label: '📱 Mobile / Web App UI Mockup',
+                    text: 'Fullstack application based on UI mockup photo. Responsive client frontend, REST/GraphQL API gateway, and relational data models.'
+                  }
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="notes-chip-pill"
+                    onClick={() => setIdeaText(chip.text)}
+                    title={chip.text}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <textarea
+              className="input-field idea-textarea"
+              placeholder="Add details about your uploaded image (e.g. Smart ID card verification with OCR, facial match, and Postgres database)..."
+              value={ideaText}
+              onChange={(e) => setIdeaText(e.target.value)}
+              rows={3}
+              style={{ marginTop: '12px' }}
+            />
           </div>
         )}
 

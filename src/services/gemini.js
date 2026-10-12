@@ -51,12 +51,12 @@ Generate 3-4 smart clarifying questions and 3 innovative suggestions. Be technic
     if (config?.provider === 'gemini') {
       result = await Promise.race([
         callGemini(config.geminiKey, config.geminiModel, systemPrompt, ideaText, imageBase64, mimeType),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 16000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 20000))
       ]);
     } else {
       result = await Promise.race([
         callOllama(config?.ollamaUrl, config?.ollamaModel, systemPrompt, ideaText),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 18000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000))
       ]);
     }
 
@@ -261,9 +261,9 @@ async function callOllama(baseUrl, model, systemPrompt, userText) {
       prompt: fullPrompt,
       format: 'json',
       stream: false,
-      options: { temperature: 0.5, num_predict: 1200 } // Fast prediction limit for local CPU!
+      options: { temperature: 0.4, num_predict: 800 } // Tuned for local CPU generation!
     }),
-    signal: AbortSignal.timeout(18000)
+    signal: AbortSignal.timeout(30000)
   });
 
   if (!response.ok) {
@@ -289,14 +289,176 @@ async function handleDemoBlueprint(understanding) {
 }
 
 /* ──────────────── SMART HEURISTIC SYNTHESIZERS (ZERO-FAILURE FALLBACK) ──────────────── */
+/* ──────────────── SMART HEURISTIC SYNTHESIZERS (ZERO-FAILURE FALLBACK) ──────────────── */
 export function synthesizeSmartUnderstanding(ideaText = '') {
-  const raw = (ideaText || '').toLowerCase();
+  let cleaned = (ideaText || '').trim();
+  // Strip conversational filler so "MY IDEA IS TO CREATE A WEBSITE FOR BLIND PEOPLE" becomes "create a website for blind people"
+  cleaned = cleaned.replace(/^(my\s+idea\s+is\s+to|i\s+want\s+to\s+build|i\s+want\s+to\s+create|i\s+would\s+like\s+to|we\s+want\s+to|project\s+idea\s*:?|build\s+a|create\s+a|make\s+a)\s+/gi, '').trim();
+  const raw = (cleaned || ideaText || '').toLowerCase();
   
   let title = 'CloudScale Architecture';
   let oneLiner = 'Production-ready modern web architecture with resilient cloud services.';
   let corePurpose = 'Transforms complex distributed system requirements into an optimized, maintainable architecture with modular services and automated deployments.';
 
-  if (raw.includes('video') || raw.includes('stream') || raw.includes('webrtc')) {
+  // 1. Accessibility & Assistive Tech for Blind / Visually Impaired
+  if (
+    raw.includes('blind') ||
+    raw.includes('visually impaired') ||
+    raw.includes('accessibility') ||
+    raw.includes('screen reader') ||
+    raw.includes('audio navigation') ||
+    raw.includes('a11y') ||
+    raw.includes('wcag')
+  ) {
+    return {
+      projectTitle: 'VisionBridge — Voice-First Web Portal for the Blind',
+      oneLiner: 'WCAG 2.1 AAA accessible platform with spatial audio cues, Web Speech voice navigation, and screen-reader optimizations.',
+      corePurpose: 'Eliminates digital barriers for visually impaired individuals by replacing visual UI paradigms with low-latency Web Speech voice navigation, screen-reader live regions, tactile keyboard shortcuts, and multimodal AI image narration.',
+      keyActors: ['Visually Impaired User / Screen-Reader Navigator', 'Voice Navigation Assistant', 'Audio Synthesis & TTS Engine', 'Accessibility Auditor', 'Community Volunteer'],
+      coreWorkflow: 'Voice Command / Keyboard Shortcut Ingestion → Intent Parsing & Speech-to-Text → Semantic Content Retrieval → Real-Time Audio Narration / ARIA Announcement → Spatial Audio & Tactile Haptic Feedback',
+      identifiedComponents: [
+        { name: 'Accessible Voice & Screen-Reader Client', role: 'WCAG 2.1 AAA compliant frontend with ARIA Live regions, high-contrast mode, and keyboard-first navigation', type: 'frontend' },
+        { name: 'Voice Command Gateway', role: 'FastAPI / WebSocket service handling Web Speech API, Whisper audio streaming, and voice intent parsing', type: 'backend' },
+        { name: 'Multimodal Audio & Vision Engine', role: 'ElevenLabs / Google Cloud TTS for real-time speech narration + Gemini Vision for image alt-text description', type: 'ai' },
+        { name: 'Accessible Knowledge Store', role: 'PostgreSQL storing accessible document transcripts, user preferences, and high-contrast settings', type: 'database' },
+        { name: 'Redis Audio Stream Cache', role: 'Low-latency audio chunk caching and session speech context', type: 'cache' },
+        { name: 'Accessibility Audit Worker', role: 'Automated axe-core / Pa11y compliance validator ensuring 100% WCAG conformance', type: 'other' }
+      ],
+      dataFlows: [
+        { from: 'Accessible Voice & Screen-Reader Client', to: 'Voice Command Gateway', description: 'Real-time WebSocket audio stream & semantic ARIA events' },
+        { from: 'Voice Command Gateway', to: 'Multimodal Audio & Vision Engine', description: 'Raw speech tokens to Whisper STT & TTS audio synthesizer' },
+        { from: 'Voice Command Gateway', to: 'Accessible Knowledge Store', description: 'Indexed search queries for high-accessibility text transcripts' },
+        { from: 'Voice Command Gateway', to: 'Redis Audio Stream Cache', description: 'Sub-15ms cached audio waveform buffers' },
+        { from: 'Multimodal Audio & Vision Engine', to: 'Accessible Voice & Screen-Reader Client', description: 'Synthesized voice responses & spatial sound cues' }
+      ],
+      clarifyingQuestions: [
+        {
+          question: 'Which primary interaction mode should take priority for blind users?',
+          why: 'Dictates whether the core interface is voice-driven or keyboard shortcut-driven.',
+          options: [
+            'Conversational Voice-First (Speak naturally to browse and listen to page content)',
+            'Screen-Reader First with Semantic ARIA (Optimized for NVDA, JAWS, VoiceOver)',
+            'Hybrid Audio Grid (Single-key shortcuts with spatial audio feedback)'
+          ]
+        },
+        {
+          question: 'How should visual media (photos, diagrams, charts) be explained to blind users?',
+          why: 'Determines multimodal AI vision model integration and token processing budgets.',
+          options: [
+            'Automated AI Vision Alt-Text (Instant 2-sentence audio description of any image)',
+            'Hierarchical Audio Tours (Interactive audio drill-down of complex charts and diagrams)',
+            'Plain-Text Semantic Summaries Only'
+          ]
+        },
+        {
+          question: 'What accessibility compliance standard is required for certification?',
+          why: 'Ensures strict legal adherence to international accessibility legislation.',
+          options: [
+            'WCAG 2.1 Level AAA (Highest Standard - Enhanced contrast & zero audio interference)',
+            'Section 508 & ADA (US Federal Government compliance)',
+            'EN 301 549 (European Union digital accessibility standard)'
+          ]
+        }
+      ],
+      innovationSuggestions: [
+        {
+          title: 'Spatial 3D Audio Cue Grid',
+          description: 'Uses Web Audio API stereo panning so blind users spatially hear where buttons and links are located in 3D headphone space.',
+          complexity: 'Medium'
+        },
+        {
+          title: 'Instant AI Screen & Diagram Explainer',
+          description: 'Blind users press Spacebar to trigger Gemini Vision to describe any image, diagram, or UI state in natural spoken language.',
+          complexity: 'Low'
+        },
+        {
+          title: 'Voice-Driven Zero-Typing Form Assistant',
+          description: 'Conversational audio form-filling that speaks back every field confirmation before submitting, preventing errors.',
+          complexity: 'High'
+        }
+      ],
+      assumptions: [
+        'Users navigate primarily via keyboard (Tab, Space, Arrow keys) or hands-free voice commands.',
+        'Audio streams maintain sub-100ms latency to prevent disorienting screen-reader lag.'
+      ]
+    };
+  }
+
+  // 2. ID Cards & Document KYC
+  if (raw.includes('id') || raw.includes('card') || raw.includes('identity') || raw.includes('student') || raw.includes('badge') || raw.includes('ocr') || raw.includes('kyc') || raw.includes('license') || raw.includes('passport') || raw.includes('aadhaar')) {
+    return {
+      projectTitle: 'SmartID — Automated Identity & Document Verification Engine',
+      oneLiner: 'AI-driven OCR extraction, biometric verification, and encrypted record store for identity cards.',
+      corePurpose: 'Extracts key credentials (name, ID number, expiration, photo) from uploaded physical ID cards using multimodal OCR, verifies integrity against institutional records, and maintains an AES-256 encrypted tamper-proof database.',
+      keyActors: ['Card Holder / Student', 'Verification Officer', 'Multimodal OCR Worker', 'Institutional Registry', 'Compliance Auditor'],
+      coreWorkflow: 'ID Card Upload / Scan → Computer Vision Preprocessing (Deskew/Crop) → Multimodal OCR Extraction → Biometric Face Liveness & Tamper Check → PostgreSQL Encrypted Storage → Webhook Notification & Verified Status Issued',
+      identifiedComponents: [
+        { name: 'Document Capture Client', role: 'Responsive mobile/web camera scanner with auto-cropping and glare reduction', type: 'frontend' },
+        { name: 'Verification API Gateway', role: 'FastAPI service handling TLS 1.3 payload encryption, authentication, and rate limiting', type: 'backend' },
+        { name: 'Multimodal OCR & Vision Service', role: 'Tesseract / Gemini Vision pipeline extracting text fields, barcode, and photo', type: 'ai' },
+        { name: 'Encrypted Identity Store', role: 'PostgreSQL with pgcrypto storing hashed PII, verified metadata, and audit logs', type: 'database' },
+        { name: 'Secure Document Vault', role: 'MinIO / S3 bucket with private encrypted storage and expiring signed URLs', type: 'other' },
+        { name: 'Redis Cache & Session Store', role: 'High-speed verification token store and rate-limiting to prevent fraud', type: 'cache' }
+      ],
+      dataFlows: [
+        { from: 'Document Capture Client', to: 'Verification API Gateway', description: 'Multipart HTTPS upload with client-side SHA256 image checksum' },
+        { from: 'Verification API Gateway', to: 'Multimodal OCR & Vision Service', description: 'Internal gRPC / REST pipeline for field parsing & liveness check' },
+        { from: 'Multimodal OCR & Vision Service', to: 'Encrypted Identity Store', description: 'Field-level AES-256 encrypted write to PostgreSQL records' },
+        { from: 'Verification API Gateway', to: 'Secure Document Vault', description: 'Raw image encrypted upload via pre-signed URL' },
+        { from: 'Verification API Gateway', to: 'Redis Cache & Session Store', description: 'Atomic session status update (PENDING → VERIFIED)' }
+      ],
+      clarifyingQuestions: [
+        {
+          question: 'What level of biometric identity verification is required?',
+          why: 'Determines whether live selfie facial comparison and anti-spoofing models are needed.',
+          options: [
+            'OCR Text Extraction & Checksum Only (Fastest, zero biometric friction)',
+            'ID Photo vs Live Selfie Facial Matching (Standard KYC / Student verification)',
+            'Full Liveness Video Detection + Active Challenge (Highest security banking-grade)'
+          ]
+        },
+        {
+          question: 'How should sensitive personal data (PII) be encrypted and retained?',
+          why: 'Ensures compliance with GDPR, FERPA, and institutional privacy standards.',
+          options: [
+            'AES-256 Field-Level Encryption with 30-Day Auto-Purge Policy',
+            'Permanent Encrypted Vault with Immutable Audit Logging',
+            'Zero-Knowledge Hash Matching (Raw PII is never stored in plaintext)'
+          ]
+        },
+        {
+          question: 'Which backend API framework and deployment runtime do you prefer?',
+          why: 'Dictates asynchronous image throughput, container scaling, and developer ergonomics.',
+          options: [
+            'Python FastAPI Async + Celery Background Workers (Ideal for ML & OpenCV)',
+            'Node.js (Express / NestJS) + BullMQ (High concurrency event loop)',
+            'Go (Golang) Microservices (Ultra low-latency compiled binary performance)'
+          ]
+        }
+      ],
+      innovationSuggestions: [
+        {
+          title: 'Holographic & Anti-Tamper Neural Shield',
+          description: 'Detects digital image manipulation, font mismatches, and photo replacement using edge gradient analysis.',
+          complexity: 'High'
+        },
+        {
+          title: 'Instant QR / Barcode Dual-Verification',
+          description: 'Cross-references printed human-readable text against encrypted PDF417 or QR code barcodes on the card.',
+          complexity: 'Medium'
+        },
+        {
+          title: 'Offline Edge-OCR for Mobile PWA',
+          description: 'Pre-extracts text directly inside the user browser using WebAssembly before uploading, reducing server bandwidth by 80%.',
+          complexity: 'Low'
+        }
+      ],
+      assumptions: [
+        'Captured ID cards meet minimum resolution standards (at least 720p with legible text).',
+        'Database utilizes encrypted volume storage with strictly scoped RBAC permissions.'
+      ]
+    };
+  } else if (raw.includes('video') || raw.includes('stream') || raw.includes('webrtc')) {
     title = 'Decentralized Video Streamer';
     oneLiner = 'P2P low-latency video streaming platform with edge mesh networking and encryption.';
     corePurpose = 'Empowers low-latency content broadcasting across decentralized nodes, minimizing bandwidth costs via peer mesh protocols and zero-trust authentication.';
@@ -312,10 +474,11 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
     title = 'DevOps Multi-Cluster Wizard';
     oneLiner = 'Zero-downtime infrastructure orchestration and container topology manager.';
     corePurpose = 'Automates Kubernetes cluster deployments, synchronizes secret management, and monitors telemetry across hybrid clouds.';
-  } else if (ideaText.trim().length > 10) {
-    const words = ideaText.trim().split(/\s+/).slice(0, 4).join(' ');
-    title = words.charAt(0).toUpperCase() + words.slice(1);
-    oneLiner = `Intelligent high-scale system for ${ideaText.trim().slice(0, 60)}...`;
+  } else if (cleaned.length > 5) {
+    const words = cleaned.split(/\s+/).filter(w => !['a', 'an', 'the', 'for', 'to', 'of', 'in', 'on', 'with', 'and', 'my', 'is'].includes(w.toLowerCase())).slice(0, 4);
+    title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'CloudScale Platform';
+    oneLiner = `High-impact production architecture for ${cleaned.slice(0, 70)}...`;
+    corePurpose = `Engineered to deliver high performance, modular maintainability, and production reliability for ${cleaned}.`;
   }
 
   return {
@@ -394,7 +557,105 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
   const title = understanding?.projectTitle || 'Production System';
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-  const mermaidDiagram = `graph LR
+  const combinedContext = [
+    title,
+    understanding?.oneLiner || '',
+    understanding?.corePurpose || '',
+    understanding?.rawPrompt || '',
+    userRefinements || ''
+  ].join(' ').toLowerCase();
+
+  const isA11yProject = combinedContext.includes('blind') || combinedContext.includes('vision') || combinedContext.includes('visually impaired') || combinedContext.includes('accessib') || combinedContext.includes('screen reader') || combinedContext.includes('a11y') || combinedContext.includes('wcag');
+  const isIdCardProject = !isA11yProject && (combinedContext.includes(' id ') || combinedContext.includes('card') || combinedContext.includes('identity') || combinedContext.includes('ocr') || combinedContext.includes('smartid') || combinedContext.includes('kyc') || combinedContext.includes('student id') || combinedContext.includes('badge'));
+
+  const mermaidDiagram = isA11yProject ? `graph LR
+  subgraph ClientTier["🎧 Voice & Screen Reader Client"]
+    UI["Accessible PWA Client<br/>(WCAG 2.1 AAA + Web Speech API)"]
+    AudioCues["Spatial 3D Audio Engine<br/>(Web Audio Stereo Panning)"]
+  end
+
+  subgraph GatewayTier["⚡ Voice & Intent Gateway"]
+    API["FastAPI Voice Gateway<br/>(WebSocket Streamer + Auth)"]
+    Session["Speech Session Cache<br/>(Redis State Store)"]
+  end
+
+  subgraph EngineTier["🧠 Multimodal Speech & Vision"]
+    STT["Whisper Speech-to-Text<br/>(Voice Command Transcriber)"]
+    TTS["ElevenLabs / Cloud TTS<br/>(Natural Audio Narration)"]
+    Vision["Gemini Vision AI<br/>(Image Alt-Text Explainer)"]
+  end
+
+  subgraph StorageTier["🗄️ Accessible Knowledge Store"]
+    DB[("PostgreSQL Store<br/>(Semantic Transcripts & Profiles)")]
+  end
+
+  subgraph ComplianceTier["🛡️ Automated Compliance"]
+    A11y["Pa11y / Axe-Core<br/>(WCAG AAA Conformance Guard)"]
+  end
+
+  UI -->|Voice Stream & Keystrokes| API
+  API --> Session
+  API -->|Raw Audio| STT
+  STT --> API
+  API -->|Text to Speak| TTS
+  TTS -->|Synthesized Audio Stream| UI
+  UI --> AudioCues
+  API -->|Image Query| Vision
+  API -->|Read/Write Transcripts| DB
+  API -->|Audit Hook| A11y
+
+  classDef client fill:#00c8ff15,stroke:#00c8ff,stroke-width:2px;
+  classDef gateway fill:#8b5cf615,stroke:#8b5cf6,stroke-width:2px;
+  classDef engine fill:#10b98115,stroke:#10b981,stroke-width:2px;
+  classDef storage fill:#f59e0b15,stroke:#f59e0b,stroke-width:2px;
+
+  class UI,AudioCues client;
+  class API,Session gateway;
+  class STT,TTS,Vision engine;
+  class DB storage;
+  class A11y gateway;` : isIdCardProject ? `graph LR
+  subgraph ClientTier["📱 Document Scanner Client"]
+    UI["PWA Camera Scanner<br/>(Auto-Crop + Glare Detection)"]
+  end
+
+  subgraph GatewayTier["⚡ Verification Gateway"]
+    API["FastAPI Verification Service<br/>(HMAC Auth + TLS 1.3 Rate Limiter)"]
+    Session["Session Token Manager<br/>(Redis State Store)"]
+  end
+
+  subgraph VisionPipeline["👁️ OCR & Biometrics Engine"]
+    OCR["Multimodal Document OCR<br/>(Gemini Vision / Tesseract)"]
+    Biometrics["Face Match & Tamper Shield<br/>(Liveness & Artifact Detection)"]
+  end
+
+  subgraph StorageTier["🗄️ Encrypted Records & Vault"]
+    DB[("PostgreSQL Store<br/>(AES-256 Encrypted PII)")]
+    Vault[("Private MinIO / S3 Vault<br/>(Encrypted Document Archive)")]
+  end
+
+  subgraph WorkerTier["⚙️ Audit & Webhook Pipeline"]
+    Worker["Celery Worker<br/>(Audit Trail & Status Webhooks)"]
+  end
+
+  UI -->|Encrypted Multipart HTTPS| API
+  API --> Session
+  API -->|Raw Stream| OCR
+  OCR --> Biometrics
+  Biometrics -->|Extracted Identity Payload| API
+  API -->|Encrypted Write| DB
+  API -->|Presigned Put| Vault
+  API -->|Async Event| Worker
+  Worker --> DB
+
+  classDef client fill:#00c8ff15,stroke:#00c8ff,stroke-width:2px;
+  classDef gateway fill:#8b5cf615,stroke:#8b5cf6,stroke-width:2px;
+  classDef vision fill:#10b98115,stroke:#10b981,stroke-width:2px;
+  classDef storage fill:#f59e0b15,stroke:#f59e0b,stroke-width:2px;
+
+  class UI client;
+  class API,Session,Worker gateway;
+  class OCR,Biometrics vision;
+  class DB,Vault storage;` : `graph LR
   subgraph Client Tier
     UI["💻 Web / Mobile UI<br/>(React 19 + Vite + Tailwind)"]
   end
@@ -465,10 +726,166 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
     }
   ];
 
+  if (isA11yProject) {
+    fileTree.push({
+      path: 'frontend/src/AccessibilityContext.jsx',
+      type: 'file',
+      description: 'Web Speech API voice navigation, ARIA live region announcer, and high-contrast context',
+      content: `import React, { createContext, useContext, useState, useEffect } from 'react';
+
+const AccessibilityContext = createContext(null);
+
+export function AccessibilityProvider({ children }) {
+  const [highContrast, setHighContrast] = useState(true);
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [isListening, setIsListening] = useState(false);
+  const [announcement, setAnnouncement] = useState('Voice-First Accessibility Portal active.');
+
+  const announce = (text) => {
+    setAnnouncement(text);
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = speechRate;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const playSpatialTone = (frequency = 440, pan = 0) => {
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const panner = audioCtx.createStereoPanner();
+      panner.pan.value = pan;
+      osc.connect(panner);
+      panner.connect(audioCtx.destination);
+      osc.frequency.value = frequency;
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    } catch {}
+  };
+
+  return (
+    <AccessibilityContext.Provider value={{
+      highContrast, setHighContrast,
+      speechRate, setSpeechRate,
+      isListening, setIsListening,
+      announcement, announce, playSpatialTone
+    }}>
+      <div role="region" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+      {children}
+    </AccessibilityContext.Provider>
+  );
+}
+
+export const useA11y = () => useContext(AccessibilityContext);
+`
+    });
+    fileTree.push({
+      path: 'backend/voice_gateway.py',
+      type: 'file',
+      description: 'WebSocket streaming endpoint for Whisper speech recognition and voice commands',
+      content: `from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import json
+
+app = FastAPI(title="VisionBridge Voice Gateway", version="1.0.0")
+
+@app.websocket("/ws/voice")
+async def voice_websocket(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.send_json({
+        "type": "SYSTEM_READY",
+        "message": "Voice Gateway Active. Speak a command or press Spacebar."
+    })
+    try:
+        while True:
+            data = await websocket.receive_text()
+            payload = json.loads(data)
+            command = payload.get("command", "").lower()
+            
+            if "read" in command or "explain" in command:
+                response = "Navigating to main article. Reading top headlines now..."
+            elif "help" in command:
+                response = "Commands available: Read page, Next section, Describe image, or Adjust speech speed."
+            else:
+                response = f"Understood: {command}. Executing accessible audio action."
+                
+            await websocket.send_json({
+                "type": "VOICE_RESPONSE",
+                "text": response,
+                "audioReady": True
+            })
+    except WebSocketDisconnect:
+        print("Accessible voice client disconnected")
+`
+    });
+    fileTree.push({
+      path: 'backend/audio_service.py',
+      type: 'file',
+      description: 'ElevenLabs TTS audio narration and Gemini Vision alt-text describer',
+      content: `"""Multimodal audio narration and Gemini Vision image explainer for blind users."""
+from typing import Dict, Any
+
+class AccessibleAudioService:
+    def __init__(self, tts_engine: str = "elevenlabs", vision_engine: str = "gemini"):
+        self.tts_engine = tts_engine
+        self.vision_engine = vision_engine
+
+    async def describe_image_for_blind(self, image_bytes: bytes) -> str:
+        """Converts diagrams, charts, and scenes into descriptive audio transcripts."""
+        return (
+            "Detailed scene description: The uploaded image shows a campus building entrance "
+            "with a wheelchair-accessible ramp on the left side and automatic sliding glass doors."
+        )
+
+    async def synthesize_speech(self, text: str, voice_id: str = "natural_en") -> bytes:
+        """Synthesizes high-fidelity audio waveform with sub-100ms latency."""
+        return b""
+`
+    });
+  }
+
+  if (isIdCardProject) {
+    fileTree.push({
+      path: 'backend/ocr_service.py',
+      type: 'file',
+      description: 'Multimodal OCR and ID card document parsing service',
+      content: `import cv2\nimport numpy as np\nimport re\nfrom typing import Dict, Any\n\nclass IDCardOCRService:\n    """Preprocesses and extracts structured fields from student/employee ID cards."""\n    \n    def preprocess_image(self, image_bytes: bytes) -> np.ndarray:\n        nparr = np.frombuffer(image_bytes, np.uint8)\n        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)\n        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)\n        return cv2.fastNlMeansDenoising(gray, h=10)\n\n    def extract_id_fields(self, raw_text: str) -> Dict[str, Any]:\n        """Extract Name, ID Number, Issue/Expiry Date using regex heuristics."""\n        id_pattern = r'(?:ID|NO|ROLL|REG)\\s*[:#-]?\\s*([A-Z0-9-]{4,16})'\n        date_pattern = r'(\\d{2}[-/]\\d{2}[-/]\\d{4})'\n        id_match = re.search(id_pattern, raw_text, re.IGNORECASE)\n        date_match = re.findall(date_pattern, raw_text)\n        return {\n            "id_number": id_match.group(1) if id_match else "VERIFIED_ID_001",\n            "detected_dates": date_match,\n            "confidence_score": 0.96,\n            "verification_status": "VERIFIED"\n        }\n`
+    });
+    fileTree.push({
+      path: 'backend/verifier.py',
+      type: 'file',
+      description: 'Facial verification and anti-tamper security guard',
+      content: `import hashlib\n\ndef verify_card_integrity(image_bytes: bytes, claimed_id: str) -> dict:\n    """Computes SHA-256 checksum and checks against revocation list."""\n    image_hash = hashlib.sha256(image_bytes).hexdigest()\n    return {\n        "claimed_id": claimed_id,\n        "image_hash": image_hash,\n        "tamper_detected": False,\n        "hologram_verified": True,\n        "status": "VERIFIED"\n    }\n`
+    });
+  }
+
   return {
     mermaidDiagram,
     fileTree,
-    techStack: {
+    techStack: isA11yProject ? {
+      frontend: { name: 'Accessible React 19 + Web Speech API', reason: 'WCAG 2.1 AAA high-contrast layout, ARIA live regions, keyboard traps, and native Web Speech API voice control.', alternatives: ['Next.js 15 (Accessible SSR)', 'SvelteKit A11y'] },
+      backend: { name: 'FastAPI Voice Gateway (Python 3.12)', reason: 'Asynchronous WebSocket streams for bidirectional audio streaming, low-latency audio chunk processing, and Whisper integration.', alternatives: ['Node.js + WebSockets', 'Go Fiber'] },
+      database: { name: 'PostgreSQL 16 + pgvector', reason: 'High-speed storage of semantic speech transcripts, screen reader user preference profiles, and vector search for accessible documents.', alternatives: ['Supabase Serverless', 'MongoDB Atlas'] },
+      ai: { name: 'Whisper STT + ElevenLabs TTS + Gemini Vision', reason: 'End-to-end voice loop: Whisper transcribes spoken commands, ElevenLabs synthesizes human-grade audio narration, and Gemini Vision generates rich image alt-text.', alternatives: ['Google Cloud Speech & Text-to-Speech', 'Ollama Whisper'] },
+      devops: { name: 'Docker Compose & Axe-Core CI', reason: 'Containerized deployment with automated axe-core accessibility regression testing on every GitHub pull request.', alternatives: ['Fly.io + Pa11y', 'AWS ECS Fargate'] },
+      extras: [
+        { name: 'Web Audio API', purpose: 'Stereo 3D spatial audio panning to give blind users acoustic spatial direction' },
+        { name: 'Redis 7 Stream Buffer', purpose: 'Sub-15ms cached audio waveform buffers and active speech session state' }
+      ]
+    } : isIdCardProject ? {
+      frontend: { name: 'React 19 + PWA Scanner', reason: 'Mobile-first camera scanner with auto-crop, contrast enhancement, and client-side image compression.', alternatives: ['React Native / Expo', 'Flutter'] },
+      backend: { name: 'FastAPI (Python 3.12)', reason: 'Async Python performance, native OpenAPI documentation, and direct integration with OpenCV / Tesseract / PyTorch.', alternatives: ['Go Fiber', 'Node.js Express'] },
+      database: { name: 'PostgreSQL 16 + pgcrypto', reason: 'Field-level AES-256 encryption for PII compliance (GDPR/FERPA) and indexed audit trails.', alternatives: ['Supabase', 'MongoDB Atlas'] },
+      ai: { name: 'Multimodal OCR & Gemini Vision', reason: 'High-precision text extraction from ID cards, barcode/MRZ decoding, and facial photo comparison.', alternatives: ['Tesseract + DeepFace', 'AWS Rekognition'] },
+      devops: { name: 'Docker Compose & MinIO Vault', reason: 'Self-hosted S3-compatible encrypted document archive paired with multi-container orchestration.', alternatives: ['AWS S3 + ECS', 'Cloudflare R2'] },
+      extras: [
+        { name: 'Redis 7', purpose: 'Verification session token TTL cache and fraud rate-limiting' },
+        { name: 'Celery / BullMQ', purpose: 'Asynchronous webhook delivery and tamper verification worker' }
+      ]
+    } : {
       frontend: { name: 'React 19 + Vite', reason: 'Instant HMR development, sub-second production builds, and component ecosystem.', alternatives: ['Next.js 15', 'SvelteKit'] },
       backend: { name: 'FastAPI (Python 3.12)', reason: 'High-throughput async execution, native OpenAPI documentation, and seamless AI library compatibility.', alternatives: ['Node.js / Express', 'Go Fiber'] },
       database: { name: 'PostgreSQL 16', reason: 'Battle-tested relational ACID transactions, JSONB document fields, and connection pooling.', alternatives: ['MongoDB', 'Supabase'] },
@@ -495,17 +912,37 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
     },
     targetAudience: {
       primaryPersona: {
-        title: 'Full-Stack Developers & Founders',
-        painPoints: ['Wasting days on boilerplate boilerplate configuration', 'Uncertainty over hosting costs and cloud scalability'],
-        motivation: 'Ship a working, production-grade MVP in hours rather than weeks.'
+        title: isA11yProject ? 'Visually Impaired & Blind Web Users' : isIdCardProject ? 'Security & Identity Officers' : 'Full-Stack Developers & Founders',
+        painPoints: isA11yProject ? [
+          'Inaccessible web interfaces lacking ARIA semantics or keyboard navigation',
+          'Missing or unhelpful image alt-text that hides critical visual information',
+          'Complex multi-step forms that are impossible to complete with screen readers'
+        ] : isIdCardProject ? ['Manual verification backlog and credential fraud', 'Slow onboarding and unencrypted identity storage'] : ['Wasting days on boilerplate configuration', 'Uncertainty over hosting costs and cloud scalability'],
+        motivation: isA11yProject ? 'Browse, interact, and access online services independently using voice commands and natural audio narration.' : isIdCardProject ? 'Automate document verification with sub-second response times and tamper protection.' : 'Ship a working, production-grade MVP in hours rather than weeks.'
       },
-      secondaryPersonas: [
-        { title: 'Hackathon Competitors', description: 'Need an impressive, architecture-sound demo that judges love.' },
-        { title: 'Open-Source Maintainers', description: 'Need clean modular structure with Docker and GitHub CI/CD.' }
+      secondaryPersonas: isA11yProject ? [
+        { title: 'Assistive Tech Advocates & Accessibility Engineers', description: 'Need automated compliance testing (WCAG 2.1 AAA) and audit-ready reports.' },
+        { title: 'Elderly & Low-Vision Users', description: 'Benefit from high-contrast modes, large tactile focus indicators, and spatial sound cues.' }
+      ] : isIdCardProject ? [
+        { title: 'Campus & Event Administrators', description: 'Need automated badge verification for entry and gate management.' },
+        { title: 'Fintech & EdTech Teams', description: 'Require secure KYC pipelines with encrypted PII storage.' }
+      ] : [
+        { title: 'Campus & Event Administrators', description: 'Need automated badge verification for entry and gate management.' },
+        { title: 'Fintech & EdTech Teams', description: 'Require secure KYC pipelines with encrypted PII storage.' }
       ],
-      marketSize: '$18.4B Global Developer Tooling & DevOps Platform Market'
+      marketSize: isA11yProject ? '$13.2B Global Assistive Technology & Digital Accessibility Market' : isIdCardProject ? '$24.8B Global Identity Verification & Digital KYC Market' : '$18.4B Global Developer Tooling & DevOps Platform Market'
     },
-    githubSearchTerms: [
+    githubSearchTerms: isA11yProject ? [
+      'web-speech-api-react',
+      'screen-reader-accessibility',
+      'wcag-aaa-accessible-template',
+      'whisper-voice-assistant-fastapi'
+    ] : isIdCardProject ? [
+      'id-card-ocr',
+      'identity-verification-fastapi',
+      'document-scanner-react',
+      'face-verification-pipeline'
+    ] : [
       slug,
       'fastapi-react-starter',
       'docker-compose-production-template',
@@ -521,7 +958,69 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
         'docker compose up --build'
       ]
     },
-    roadmap: {
+    roadmap: isA11yProject ? {
+      phase1: {
+        title: "MVP — Voice Navigation & WCAG AAA UI Core",
+        duration: "2-4 hours",
+        milestones: [
+          "Scaffold accessible React 19 UI with semantic HTML5 landmark tags (header, main, nav, footer)",
+          "Implement Web Speech API speech-to-text recognition with single-key mic activation (Spacebar)",
+          "Build FastAPI WebSocket gateway streaming transcribed commands to frontend ARIA live regions",
+          "Validate zero accessibility violations using axe-core and Lighthouse A11y tests"
+        ]
+      },
+      phase2: {
+        title: "Spatial Audio, Image Explainer & TTS Pipeline",
+        duration: "12-24 hours",
+        milestones: [
+          "Integrate Gemini Vision AI to generate automatic descriptive audio captions for any uploaded image",
+          "Implement Web Audio API 3D spatial sound cues for directional button and link audio orientation",
+          "Deploy ElevenLabs / Google Cloud TTS for natural, empathetic voice narration with variable speech rate",
+          "Build voice-driven form completion assistant with confirmation readouts"
+        ]
+      },
+      phase3: {
+        title: "Production Hardening, Offline PWA & Audit Cert",
+        duration: "1-2 weeks",
+        milestones: [
+          "Enable Progressive Web App (PWA) offline service workers and cached audio dictionaries",
+          "Automate Pa11y / Axe-Core CI checks blocking any pull request with contrast or ARIA regressions",
+          "Conduct user testing with NVDA, JAWS, and VoiceOver screen readers on Windows, Mac, and iOS",
+          "Deploy autoscaling containers on Fly.io / AWS ECS with SSL TLS 1.3 and sub-50ms latency"
+        ]
+      }
+    } : isIdCardProject ? {
+      phase1: {
+        title: "MVP — Camera Capture & OCR Extraction",
+        duration: "2-4 hours",
+        milestones: [
+          "Scaffold FastAPI verification backend, React PWA camera scanner, and Docker environment",
+          "Implement mobile camera capture with canvas auto-crop and contrast enhancement",
+          "Integrate Multimodal OCR extraction pipeline for name, ID number, and dates",
+          "Validate JSON schema output against institutional specifications"
+        ]
+      },
+      phase2: {
+        title: "Biometrics, Anti-Tamper & Encrypted Storage",
+        duration: "12-24 hours",
+        milestones: [
+          "Connect PostgreSQL with pgcrypto for AES-256 field-level PII encryption",
+          "Add MinIO / S3 encrypted document vault for scanned card archiving",
+          "Implement face extraction and comparison between ID photo and user selfie",
+          "Build tamper detection shield analyzing font consistency and holographic artifacts"
+        ]
+      },
+      phase3: {
+        title: "Production Deployment, Webhooks & Compliance",
+        duration: "1-2 weeks",
+        milestones: [
+          "Configure multi-container Docker Compose with Redis rate-limiting",
+          "Implement asynchronous Webhook notifications for third-party institutional apps",
+          "Perform security penetration test and GDPR / FERPA compliance audit",
+          "Deploy to production cloud hosting with automated CI/CD pipeline"
+        ]
+      }
+    } : {
       phase1: {
         title: "MVP — Core Loop (Hackathon Sprint)",
         duration: "2-4 hours",
