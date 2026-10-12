@@ -204,21 +204,21 @@ export default function CopilotDrawer({
     stopAudio();
 
     const langShort = langCode.split('-')[0].toLowerCase();
-    // Split on sentence punctuation (. ? ! \n)
-    const sentences = cleanText.split(/([.?!;\n]+)/).filter(Boolean);
+    // STRICT CHUNKING TO MAX 75 CHARS PER CHUNK: Google Translate TTS returns 400 if chunk > 90 chars
+    const words = cleanText.split(/\s+/).filter(Boolean);
     const chunks = [];
     let currentChunk = '';
 
-    for (const part of sentences) {
-      if ((currentChunk + part).length > 140) {
+    for (const word of words) {
+      if ((currentChunk + ' ' + word).trim().length > 72) {
         if (currentChunk.trim()) chunks.push(currentChunk.trim());
-        currentChunk = part;
+        currentChunk = word;
       } else {
-        currentChunk += part;
+        currentChunk = currentChunk ? currentChunk + ' ' + word : word;
       }
     }
     if (currentChunk.trim()) chunks.push(currentChunk.trim());
-    if (chunks.length === 0) chunks.push(cleanText.slice(0, 140));
+    if (chunks.length === 0 && cleanText.trim()) chunks.push(cleanText.slice(0, 72));
 
     let currentIndex = 0;
     setSpeakingMsgId(msgId);
@@ -240,12 +240,12 @@ export default function CopilotDrawer({
       };
 
       audio.onerror = (e) => {
-        console.warn('TTS proxy playback error on chunk, moving to next:', e);
+        console.warn('TTS proxy chunk notice, skipping to next:', e);
         playNext();
       };
 
       audio.play().catch(playErr => {
-        console.warn('Audio play autoplay error:', playErr);
+        console.warn('Audio play autoplay restriction:', playErr);
         setSpeakingMsgId(null);
         audioPlayerRef.current = null;
       });
@@ -261,22 +261,28 @@ export default function CopilotDrawer({
       return;
     }
 
-    // Strip markdown formatting, code blocks, and action tags for clean voice output
+    // Strip markdown formatting, code blocks, action tags, and emojis for clean voice output
     const clean = text
       .replace(/```[\s\S]*?```/g, '')
       .replace(/`.*?`/g, '')
       .replace(/[*#_~>]/g, '')
       .replace(/<<<[\s\S]*?>>>/g, '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
       .trim();
 
     if (!clean) return;
 
-    // Check if we need proxy (Telugu, Hindi without OS pack, etc.)
+    const prefix = langCode.split('-')[0].toLowerCase();
+    // For Telugu (and languages lacking high quality native OS packs), ALWAYS use the reliable proxy engine!
+    if (prefix === 'te') {
+      playAudioViaProxy(clean, langCode, msgId);
+      return;
+    }
+
     const canUseNative = hasNativeVoice(langCode);
 
     if (!canUseNative) {
-      // Use proxy endpoint for Telugu and any language missing a native OS voice!
       playAudioViaProxy(clean, langCode, msgId);
       return;
     }
@@ -424,27 +430,83 @@ export default function CopilotDrawer({
       {/* Main Drawer Window */}
       {isOpen && (
         <div className={`copilot-panel card ${isMinimized ? 'copilot-panel--minimized' : ''} animate-slide-up`}>
-          {/* Header */}
+          {/* Enhanced 2-Row Header */}
           <div className="copilot-header">
-            <div className="copilot-header-brand">
-              <span className="copilot-avatar">🤖</span>
-              <div>
-                <div className="copilot-title">
-                  Architect Co-Founder
-                  <span className="live-status-dot" title="Active Copilot" />
+            {/* Top Bar: Title & Window Controls */}
+            <div className="copilot-header-top">
+              <div className="copilot-brand-wrap">
+                <span className="copilot-avatar">🤖</span>
+                <div className="copilot-title-box">
+                  <div className="copilot-title">
+                    Architect Co-Founder
+                    <span className="live-status-dot" title="Active & Ready" />
+                  </div>
+                  <span className="copilot-role-label">AI Principal Architect</span>
                 </div>
-                <div className="copilot-meta">
-                  <span className="copilot-stage-tag">📍 {getStageLabel(currentStage)}</span>
-                  <span className="copilot-engine-tag">
-                    {config?.provider === 'ollama' ? `🦙 ${config?.ollamaModel || 'Ollama'}` : config?.provider === 'gemini' ? '✨ Gemini' : '⚡ Instant Sandbox'}
-                  </span>
-                </div>
+              </div>
+
+              <div className="copilot-header-ctrls">
+                {/* Voice Audio Toggle */}
+                <button
+                  type="button"
+                  className={`ctrl-btn ${ttsEnabled ? 'active' : ''}`}
+                  onClick={() => {
+                    const nextState = !ttsEnabled;
+                    setTtsEnabled(nextState);
+                    if (!nextState) stopAudio();
+                  }}
+                  title={ttsEnabled ? `Voice Output: ON (${selectedLang.native})` : 'Voice Output: OFF (Muted)'}
+                >
+                  <span className="ctrl-btn-icon">{ttsEnabled ? '🔊' : '🔇'}</span>
+                  <span className="ctrl-btn-text">{ttsEnabled ? 'Voice' : 'Mute'}</span>
+                </button>
+
+                {/* Auto Action Toggle */}
+                <button
+                  type="button"
+                  className={`ctrl-btn ${autoApply ? 'active' : ''}`}
+                  onClick={() => setAutoApply(!autoApply)}
+                  title={autoApply ? 'Auto-Execute Actions: ON' : 'Auto-Execute Actions: OFF'}
+                >
+                  <span className="ctrl-btn-icon">⚡</span>
+                  <span className="ctrl-btn-text">Auto</span>
+                </button>
+
+                {/* Minimize Drawer */}
+                <button
+                  type="button"
+                  className="ctrl-icon-btn"
+                  onClick={() => setIsMinimized(!isMinimized)}
+                  title={isMinimized ? 'Expand Drawer' : 'Minimize Drawer'}
+                >
+                  {isMinimized ? '▲' : '▼'}
+                </button>
+
+                {/* Close Drawer */}
+                <button
+                  type="button"
+                  className="ctrl-icon-btn ctrl-close-btn"
+                  onClick={() => {
+                    stopAudio();
+                    setIsOpen(false);
+                  }}
+                  title="Close Copilot"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
-            <div className="copilot-header-actions">
-              {/* Language Selector Dropdown */}
-              <div className="copilot-lang-picker" title="Select Co-Founder Language & Audio Voice">
+            {/* Sub Bar: Stage pill, Engine pill, and Full Language Picker */}
+            <div className="copilot-header-sub">
+              <div className="copilot-meta-pills">
+                <span className="copilot-stage-tag">📍 {getStageLabel(currentStage)}</span>
+                <span className="copilot-engine-tag">
+                  {config?.provider === 'ollama' ? `🦙 ${config?.ollamaModel || 'Ollama'}` : config?.provider === 'gemini' ? '✨ Gemini' : '⚡ Sandbox'}
+                </span>
+              </div>
+
+              <div className="copilot-lang-picker" title="Choose language for conversation and voice speech">
                 <span className="lang-globe-icon">🌐</span>
                 <select
                   className="copilot-lang-select"
@@ -462,53 +524,6 @@ export default function CopilotDrawer({
                   ))}
                 </select>
               </div>
-
-              {/* Auto Action Toggle */}
-              <button
-                type="button"
-                className={`btn-icon ${autoApply ? 'active' : ''}`}
-                onClick={() => setAutoApply(!autoApply)}
-                title={autoApply ? 'Auto-Execute Actions: ON' : 'Auto-Execute Actions: OFF'}
-              >
-                ⚡
-              </button>
-
-              {/* Text-To-Speech Audio Auto-Play Toggle */}
-              <button
-                type="button"
-                className={`btn-icon ${ttsEnabled ? 'active' : ''}`}
-                onClick={() => {
-                  const nextState = !ttsEnabled;
-                  setTtsEnabled(nextState);
-                  if (!nextState) {
-                    stopAudio();
-                  }
-                }}
-                title={ttsEnabled ? `Audio Speech Out: ON (${selectedLang.native})` : 'Audio Speech Out: OFF'}
-              >
-                {ttsEnabled ? '🔊' : '🔇'}
-              </button>
-
-              <button
-                type="button"
-                className="btn-icon"
-                onClick={() => setIsMinimized(!isMinimized)}
-                title={isMinimized ? 'Expand Drawer' : 'Minimize Drawer'}
-              >
-                {isMinimized ? '🔼' : '🔽'}
-              </button>
-
-              <button
-                type="button"
-                className="btn-icon"
-                onClick={() => {
-                  stopAudio();
-                  setIsOpen(false);
-                }}
-                title="Close Copilot"
-              >
-                ✕
-              </button>
             </div>
           </div>
 

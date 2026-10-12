@@ -208,39 +208,65 @@ export function parseCopilotResponse(rawText) {
   let action = null;
   let cleanText = rawText;
 
-  // Pattern 1: Any <<...>> or <<<...>>> action block
-  const blockRegex = /<{2,3}[A-Z_]+>{2,3}\s*(\{[\s\S]*?\})\s*<{2,3}END[A-Z_]*>{2,3}/i;
+  // Pattern 1: Check for explicit <<<ACTION>>> or <<ACTION>> block
+  const blockRegex = /<{2,3}[A-Z_]+>{2,3}\s*([\s\S]*?)\s*<{2,3}END[A-Z_]*>{2,3}/i;
   const blockMatch = rawText.match(blockRegex);
 
   if (blockMatch) {
     try {
-      action = JSON.parse(blockMatch[1]);
+      action = JSON.parse(blockMatch[1].trim());
       cleanText = rawText.replace(blockRegex, '').trim();
     } catch (e) {
       console.warn('Failed to parse block action JSON:', e);
     }
   }
 
-  // Pattern 2: Search for direct action JSON object if pattern 1 did not match
+  // Pattern 2: Search for balanced curly braces around any action "type": "..."
   if (!action) {
-    const jsonRegex = /\{[\s\r\n]*"type"[\s\r\n]*:[\s\r\n]*"(FILL_IDEA|APPEND_IDEA|SWITCH_INPUT_TAB|LOAD_SAMPLE|SUBMIT_IDEA|SELECT_ALIGNMENT_ANSWER|SET_ALIGNMENT_NOTES|CONFIRM_ALIGNMENT|SWITCH_DASHBOARD_TAB|SET_DAU|DOWNLOAD_REPO|SWITCH_TO_DEMO)"[\s\S]*?\}/;
-    const jsonMatch = cleanText.match(jsonRegex);
-    if (jsonMatch) {
-      try {
-        action = JSON.parse(jsonMatch[0]);
-        cleanText = cleanText.replace(jsonMatch[0], '').trim();
-      } catch (e) {
-        console.warn('Failed to parse inline action JSON:', e);
+    const typeKeywordIdx = cleanText.search(/"type"\s*:\s*"(FILL_IDEA|APPEND_IDEA|SWITCH_INPUT_TAB|LOAD_SAMPLE|SUBMIT_IDEA|SELECT_ALIGNMENT_ANSWER|SET_ALIGNMENT_NOTES|CONFIRM_ALIGNMENT|SWITCH_DASHBOARD_TAB|SET_DAU|DOWNLOAD_REPO|SWITCH_TO_DEMO)"/);
+    if (typeKeywordIdx !== -1) {
+      const openIdx = cleanText.lastIndexOf('{', typeKeywordIdx);
+      if (openIdx !== -1) {
+        let depth = 0;
+        let closeIdx = -1;
+        for (let i = openIdx; i < cleanText.length; i++) {
+          if (cleanText[i] === '{') depth++;
+          else if (cleanText[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              closeIdx = i;
+              break;
+            }
+          }
+        }
+
+        if (closeIdx !== -1) {
+          const jsonStr = cleanText.slice(openIdx, closeIdx + 1);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.type) {
+              action = parsed;
+              cleanText = (cleanText.slice(0, openIdx) + cleanText.slice(closeIdx + 1)).trim();
+            }
+          } catch (e) {
+            console.warn('Failed to parse balanced action JSON:', e);
+          }
+        }
       }
     }
   }
 
-  // Clean any residual action tags or delimiters from cleanText
+  // Clean any residual raw JSON blocks, code-fenced action JSON, or stray delimiter tags
   cleanText = cleanText
-    .replace(/<{2,3}[A-Z_]+>{2,3}/gi, '')
-    .replace(/<{2,3}END[A-Z_]*>{2,3}/gi, '')
+    .replace(/```(?:json)?\s*\{[\s\S]*?"type"[\s\S]*?\}\s*```/gi, '')
+    .replace(/\{[\s\r\n]*"type"[\s\r\n]*:[\s\S]*?"params"[\s\S]*?\}(?:\s*\})/gi, '')
+    .replace(/<{2,4}[\s\S]*?>{2,4}/g, '')
+    .replace(/<{2,4}[A-Z0-9_\s]+/gi, '')
+    .replace(/[A-Z0-9_\s]+>{2,4}/gi, '')
+    .replace(/^\s*<<+.*$/gm, '')
+    .replace(/^\s*>>+.*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
-
   // Ensure default label if missing
   if (action && !action.label) {
     action.label = getDefaultActionLabel(action);

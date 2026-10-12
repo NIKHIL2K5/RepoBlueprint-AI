@@ -4,25 +4,41 @@ import './BlueprintDashboard.css';
 import { downloadProjectZip } from '../services/zipper';
 import { searchGitHubRepos } from '../services/github';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'dark',
-  themeVariables: {
-    background: '#060d1a',
-    mainBkg: '#0c1629',
-    nodeBorder: '#00c8ff',
-    clusterBkg: '#0d1833',
-    titleColor: '#f0f8ff',
-    edgeLabelBackground: '#0c1629',
-    lineColor: '#00c8ff',
-    primaryColor: '#0f1f42',
-    primaryTextColor: '#f0f8ff',
-    primaryBorderColor: '#00c8ff',
-    secondaryColor: '#1a2a5a',
-    tertiaryColor: '#152348',
-  },
-  flowchart: { curve: 'basis', padding: 24 },
-});
+const setupMermaidTheme = () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: isDark ? {
+      background: '#1F1E1D',
+      mainBkg: '#30302E',
+      nodeBorder: '#D97757',
+      clusterBkg: '#262624',
+      titleColor: '#F5F4ED',
+      edgeLabelBackground: '#30302E',
+      lineColor: '#D97757',
+      primaryColor: '#30302E',
+      primaryTextColor: '#F5F4ED',
+      primaryBorderColor: '#D97757',
+      secondaryColor: '#3A3936',
+      tertiaryColor: '#1F1E1D',
+    } : {
+      background: '#FAF9F5',
+      mainBkg: '#FFFFFF',
+      nodeBorder: '#D97757',
+      clusterBkg: '#F5F4ED',
+      titleColor: '#141413',
+      edgeLabelBackground: '#FFFFFF',
+      lineColor: '#D97757',
+      primaryColor: '#FFFFFF',
+      primaryTextColor: '#141413',
+      primaryBorderColor: '#D97757',
+      secondaryColor: '#F0EEE6',
+      tertiaryColor: '#E8E6DC',
+    },
+    flowchart: { curve: 'basis', padding: 24 },
+  });
+};
 
 const TABS = [
   { id: 'blueprint', icon: '🌐', label: 'Architecture' },
@@ -76,6 +92,7 @@ export default function BlueprintDashboard({
         cleanDiagram = `graph LR\n${cleanDiagram}`;
       }
 
+      setupMermaidTheme();
       mermaid.render(id, cleanDiagram).then(({ svg }) => {
         if (mermaidRef.current) mermaidRef.current.innerHTML = svg;
       }).catch(err => {

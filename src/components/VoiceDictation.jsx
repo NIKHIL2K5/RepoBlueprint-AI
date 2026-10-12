@@ -26,6 +26,23 @@ const SAMPLE_SPOKEN_IDEAS = {
   'hi-IN': [
     'मैं WebRTC, IPFS और React का उपयोग करके एक ओपन-सोर्स वीडियो स्ट्रीमिंग प्लेटफॉर्म बनाना चाहता हूँ।',
     'GitHub रिपॉजिटरी के लिए एक AI बग ट्राइएज बॉट जो समस्याओं का विश्लेषण करता है और पुल रिक्वेस्ट बनाता है।',
+    'रीयल-टाइम व्हाइटबोर्ड और आर्किटेक्चर ब्लूप्रिंट्स को डॉकर स्टार्टर कोड के साथ ऑटोमैटिक जनरेट करने वाला AI टूल।',
+  ],
+  'es-ES': [
+    'Quiero construir una plataforma de streaming de video descentralizada con WebRTC, IPFS y React con cifrado de extremo a extremo.',
+    'Un bot de triaje de errores con IA para repositorios de GitHub que analiza issues y propone pull requests.',
+  ],
+  'fr-FR': [
+    'Je souhaite créer une plateforme de streaming vidéo décentralisée et open source utilisant WebRTC, IPFS et React avec chiffrement de bout en bout.',
+  ],
+  'de-DE': [
+    'Ich möchte eine dezentrale Open-Source-Videostreaming-Plattform mit WebRTC, IPFS und React entwickeln.',
+  ],
+  'ja-JP': [
+    'WebRTC、IPFS、Reactを使用して、エンドツーエンド暗号化を備えた分散型動画配信プラットフォームを構築したいです。',
+  ],
+  'zh-CN': [
+    '我想使用 WebRTC、IPFS 和 React 构建一个具有端到端加密的开源去中心化视频流媒体平台。',
   ],
 };
 
@@ -33,35 +50,90 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
   const [selectedLang, setSelectedLang] = useState(DICTATION_LANGUAGES[0]);
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const [audioLevel, setAudioLevel] = useState(0); // 0 to 100
+  const [voiceDetected, setVoiceDetected] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [isSupported, setIsSupported] = useState(true);
 
   const recognitionRef = useRef(null);
+  const shouldKeepListeningRef = useRef(false);
   const initialTextRef = useRef('');
   const finalTranscriptRef = useRef('');
   const interimTranscriptRef = useRef('');
+  const mediaStreamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const animFrameRef = useRef(null);
 
-  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognitionAPI = typeof window !== 'undefined'
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : null;
 
   useEffect(() => {
     if (!SpeechRecognitionAPI) {
       setIsSupported(false);
     }
     return () => {
-      stopRecognition();
+      stopListening();
     };
   }, []);
 
-  const stopRecognition = () => {
-    if (recognitionRef.current) {
+  const stopHardwareAudio = () => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch (e) {}
+      audioContextRef.current = null;
+    }
+    if (mediaStreamRef.current) {
       try {
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.abort();
+        mediaStreamRef.current.getTracks().forEach(t => t.stop());
       } catch (e) {}
-      recognitionRef.current = null;
+      mediaStreamRef.current = null;
+    }
+    setAudioLevel(0);
+    setVoiceDetected(false);
+  };
+
+  const startHardwareAudioLevelMeter = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      audioContextRef.current = audioCtx;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const checkVolume = () => {
+        if (!shouldKeepListeningRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / bufferLength;
+        const normalized = Math.min(100, Math.round((avg / 128) * 100));
+        setAudioLevel(normalized);
+        if (normalized > 8) {
+          setVoiceDetected(true);
+        }
+        animFrameRef.current = requestAnimationFrame(checkVolume);
+      };
+      animFrameRef.current = requestAnimationFrame(checkVolume);
+    } catch (err) {
+      console.warn('Microphone meter initialization note:', err.message);
     }
   };
 
@@ -74,36 +146,8 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
     else if (onAppend) onAppend(spoken);
   }, [onChange, onAppend]);
 
-  const startListening = async () => {
-    setErrorMsg('');
-    setStatusMsg('Requesting microphone access…');
-
-    // CRITICAL FIX: Request mic permission and immediately release hardware lock
-    // Windows WASAPI blocks WebkitSpeechRecognition if AudioContext holds the track open
-    if (navigator.mediaDevices?.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Immediately stop all tracks to release the hardware lock back to OS
-        stream.getTracks().forEach(track => track.stop());
-        setStatusMsg('Microphone access granted. Starting…');
-      } catch (err) {
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setErrorMsg('Microphone permission denied. Click the 🔒 icon in your address bar → select "Allow" for microphone, then try again.');
-          setStatusMsg('');
-          return;
-        }
-        // On some browsers getUserMedia fails but SpeechRecognition still works — continue
-        console.warn('getUserMedia failed (non-blocking):', err.message);
-      }
-    }
-
-    if (!SpeechRecognitionAPI) {
-      setErrorMsg('Speech recognition is not available in this browser. Please use Chrome or Edge.');
-      setStatusMsg('');
-      return;
-    }
-
-    stopRecognition(); // Clean up any existing instance
+  const initRecognition = () => {
+    if (!SpeechRecognitionAPI) return null;
 
     try {
       const recognition = new SpeechRecognitionAPI();
@@ -111,11 +155,6 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
       recognition.interimResults = true;
       recognition.lang = selectedLang.code;
       recognition.maxAlternatives = 1;
-
-      // Reset transcript buffers
-      initialTextRef.current = value || '';
-      finalTranscriptRef.current = '';
-      interimTranscriptRef.current = '';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -128,8 +167,9 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
         let currentInterim = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0]?.transcript || '';
-          if (event.results[i].isFinal) {
+          const item = event.results[i];
+          const transcript = item[0]?.transcript || '';
+          if (item.isFinal) {
             currentFinal += transcript + ' ';
           } else {
             currentInterim += transcript;
@@ -142,7 +182,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
         interimTranscriptRef.current = currentInterim;
         setInterimText(currentInterim);
 
-        // Live update — stream words to textarea
+        // Live stream text directly into draft
         const allSpoken = (finalTranscriptRef.current + (currentInterim ? ' ' + currentInterim : '')).trim();
         if (allSpoken) {
           const base = initialTextRef.current.trim();
@@ -153,60 +193,114 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
 
       recognition.onerror = (event) => {
         if (event.error === 'aborted' || event.error === 'no-speech') {
-          // Benign: user stopped or no audio yet
+          // Normal pause in speech, keep listening!
           return;
         }
-        console.warn('[VoiceDictation] error:', event.error);
+        console.warn('[VoiceDictation] error event:', event.error);
+
         if (event.error === 'not-allowed') {
-          setErrorMsg('Microphone access blocked. Click 🔒 in address bar → Allow microphone.');
+          setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
+          shouldKeepListeningRef.current = false;
           setIsListening(false);
         } else if (event.error === 'network') {
-          setErrorMsg('Network error with browser speech service. Try using the Sample buttons below.');
-          commitFinalText();
-          setIsListening(false);
-        } else if (event.error === 'audio-capture') {
-          setErrorMsg('Could not capture audio. Make sure your microphone is connected and not in use by another app.');
-          setIsListening(false);
-        } else if (event.error === 'service-not-allowed') {
-          setErrorMsg('Speech service not allowed. Make sure you\'re using HTTPS or localhost.');
-          setIsListening(false);
+          setErrorMsg(`Network issue with speech recognition for ${selectedLang.name}. You can click any test sample below.`);
         } else {
-          setErrorMsg(`Voice error: ${event.error}. Try the sample buttons below.`);
+          setErrorMsg(`Voice notice: ${event.error}. You can also insert sample text below.`);
         }
       };
 
       recognition.onend = () => {
-        // Auto-commit on recognition ending
-        commitFinalText();
-        setIsListening(false);
-        setInterimText('');
-        setStatusMsg('');
+        // Auto-restart if user has NOT clicked stop (Chrome terminates recognition on short pauses)
+        if (shouldKeepListeningRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // Already started or restarting
+          }
+        } else {
+          commitFinalText();
+          setIsListening(false);
+          setInterimText('');
+          setStatusMsg('');
+          stopHardwareAudio();
+        }
       };
 
-      recognitionRef.current = recognition;
+      return recognition;
+    } catch (e) {
+      console.error('Failed to create SpeechRecognition:', e);
+      return null;
+    }
+  };
 
-      // Small delay after releasing mic hardware lock to let OS reset
-      await new Promise(res => setTimeout(res, 120));
-      recognition.start();
+  const startListening = async () => {
+    setErrorMsg('');
+    setStatusMsg(`Connecting microphone in ${selectedLang.flag} ${selectedLang.native}…`);
+    shouldKeepListeningRef.current = true;
 
-    } catch (err) {
-      console.error('[VoiceDictation] Failed to start:', err);
-      setErrorMsg(`Could not start voice: ${err.message || 'Check microphone permissions.'}`);
+    // Reset transcription buffers
+    initialTextRef.current = value || '';
+    finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    setInterimText('');
+    setVoiceDetected(false);
+
+    // Start hardware VU meter for real-time visual feedback
+    await startHardwareAudioLevelMeter();
+
+    if (!SpeechRecognitionAPI) {
+      setErrorMsg('Web Speech API is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
       setStatusMsg('');
+      shouldKeepListeningRef.current = false;
+      return;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch (e) {}
+      }
+
+      const rec = initRecognition();
+      if (!rec) {
+        setErrorMsg('Could not initialize speech recognizer.');
+        shouldKeepListeningRef.current = false;
+        return;
+      }
+
+      recognitionRef.current = rec;
+      rec.start();
+      setStatusMsg('');
+    } catch (err) {
+      console.error('Recognition start error:', err);
+      setErrorMsg(`Could not activate mic: ${err.message || 'Check browser permissions'}`);
+      setStatusMsg('');
+      shouldKeepListeningRef.current = false;
       setIsListening(false);
+      stopHardwareAudio();
     }
   };
 
   const stopListening = () => {
+    shouldKeepListeningRef.current = false;
     commitFinalText();
-    stopRecognition();
+
+    if (recognitionRef.current) {
+      try {
+        // Use stop() so Chrome processes any final pending words before closing
+        recognitionRef.current.stop();
+      } catch (e) {
+        try { recognitionRef.current.abort(); } catch (err) {}
+      }
+    }
+
     setIsListening(false);
     setInterimText('');
     setStatusMsg('');
+    stopHardwareAudio();
   };
 
   const toggleListening = () => {
-    if (isListening) {
+    if (isListening || shouldKeepListeningRef.current) {
       stopListening();
     } else {
       startListening();
@@ -231,15 +325,15 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
 
   if (!isSupported) {
     return (
-      <div className="voice-unsupported">
-        <span>⚠️</span>
+      <div className="voice-unsupported card">
+        <span className="unsupported-icon">🎙️</span>
         <div>
-          <strong>Speech Recognition Unavailable</strong>
-          <p>Please use Chrome or Edge. In the meantime, use these sample ideas:</p>
+          <strong>Speech Recognition Notice</strong>
+          <p>Native voice recognition is best experienced in Chrome or Edge. In this browser, you can insert realistic spoken prompts in any language with 1 click:</p>
           <div className="voice-samples-row">
-            {(SAMPLE_SPOKEN_IDEAS['en-US']).map((sample, i) => (
-              <button key={i} type="button" className="btn btn-ghost" onClick={() => handleSimulateSpeech(sample)}>
-                Insert Sample #{i + 1}
+            {currentSamples.map((sample, i) => (
+              <button key={i} type="button" className="btn btn-secondary" onClick={() => handleSimulateSpeech(sample)}>
+                Insert {selectedLang.flag} {selectedLang.native} Sample #{i + 1}
               </button>
             ))}
           </div>
@@ -251,7 +345,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
   return (
     <div className={`voice-dictation-card ${isListening ? 'voice-card--active' : ''}`}>
 
-      {/* Language Pill Bar */}
+      {/* Language Selector Bar */}
       <div className="dictation-lang-bar">
         <span className="dictation-lang-label">🎙️ Dictate Language:</span>
         <div className="lang-pills-row">
@@ -269,7 +363,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
         </div>
       </div>
 
-      {/* Mic Button + Status */}
+      {/* Mic Button + Live Audio Visualizer + Status */}
       <div className="voice-visualizer-area">
         <button
           type="button"
@@ -287,35 +381,48 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
           {statusMsg && (
             <div className="status-pending">⏳ {statusMsg}</div>
           )}
+
           {!statusMsg && isListening && (
             <>
               <div className="status-live">
                 <span className="live-dot" />
-                <span>Listening in {selectedLang.flag} {selectedLang.native}… speak naturally</span>
+                <span>Listening in {selectedLang.flag} {selectedLang.native} ({selectedLang.name})… speak naturally</span>
               </div>
-              <div className="wave-bars">
-                <span className="wave-bar" /><span className="wave-bar" /><span className="wave-bar" />
-                <span className="wave-bar" /><span className="wave-bar" />
+
+              {/* Dynamic VU Meter responding to actual voice volume */}
+              <div className="voice-level-meter-row">
+                <div className="wave-bars">
+                  <span className="wave-bar" style={{ height: `${Math.max(6, Math.min(24, audioLevel * 0.4))}px` }} />
+                  <span className="wave-bar" style={{ height: `${Math.max(8, Math.min(28, audioLevel * 0.6))}px` }} />
+                  <span className="wave-bar" style={{ height: `${Math.max(10, Math.min(32, audioLevel * 0.8))}px` }} />
+                  <span className="wave-bar" style={{ height: `${Math.max(8, Math.min(28, audioLevel * 0.6))}px` }} />
+                  <span className="wave-bar" style={{ height: `${Math.max(6, Math.min(24, audioLevel * 0.4))}px` }} />
+                </div>
+                <span className="voice-indicator-pill">
+                  {voiceDetected || audioLevel > 5 ? '🟢 Voice Detected' : '⚪ Speak into microphone…'}
+                </span>
               </div>
+
               <div className="voice-vol-indicator">
-                Click ⏹ to stop and save your speech
+                Click ⏹ to stop dictating and preserve your draft.
               </div>
             </>
           )}
+
           {!statusMsg && !isListening && (
             <>
               <div className="status-idle">
                 Click Microphone to Dictate in {selectedLang.flag} {selectedLang.native} ({selectedLang.name})
               </div>
               <div className="status-sub">
-                Speak your project idea, tech stack, and goals. Words stream into the draft below.
+                Speak your project idea, architecture choices, and requirements. Spoken words stream directly into your draft.
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Error Banner */}
+      {/* Error or Warning Banner */}
       {errorMsg && (
         <div className="voice-error-banner">
           <span>⚠️</span>
@@ -323,17 +430,17 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
         </div>
       )}
 
-      {/* Live interim preview */}
+      {/* Live Interim Transcription Stream */}
       {isListening && interimText && (
-        <div className="interim-stream">
+        <div className="interim-stream animate-slide-up">
           <span className="stream-label">Hearing:</span>
           <span className="stream-text">"{interimText}"</span>
         </div>
       )}
 
-      {/* Quick Sample Buttons */}
+      {/* Quick Test Samples for Selected Language */}
       <div className="voice-helpers-row">
-        <span className="helpers-label">⚡ Test sample input ({selectedLang.native}):</span>
+        <span className="helpers-label">⚡ 1-Click Spoken Test Templates ({selectedLang.flag} {selectedLang.native}):</span>
         <div className="samples-pills">
           {currentSamples.map((sample, i) => (
             <button
@@ -343,7 +450,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
               onClick={() => handleSimulateSpeech(sample)}
               title={sample}
             >
-              Sample #{i + 1}
+              Insert Sample #{i + 1}
             </button>
           ))}
         </div>

@@ -129,11 +129,11 @@ export default function InputStage({
         {/* Tab switcher */}
         <div className="tab-list" role="tablist">
           {[
-            { id: 'sketch', icon: '🎨', label: 'Draw on Napkin Canvas' },
-            { id: 'voice',  icon: '🎙️', label: 'Dictate via Voice' },
-            { id: 'text',   icon: '✍️', label: 'Describe Your Idea' },
-            { id: 'image',  icon: '📸', label: 'Upload Board Photo' },
-            { id: 'link',   icon: '🔗', label: 'Paste Doc / GitHub Link' },
+            { id: 'sketch', icon: '🎨', label: 'Napkin Whiteboard' },
+            { id: 'voice',  icon: '🎙️', label: 'Voice Dictation' },
+            { id: 'text',   icon: '✍️', label: 'Describe Idea' },
+            { id: 'image',  icon: '📸', label: 'Upload Photo' },
+            { id: 'link',   icon: '🔗', label: 'Import Link' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -142,7 +142,8 @@ export default function InputStage({
               className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
-              {tab.icon} {tab.label}
+              <span className="tab-icon">{tab.icon}</span>
+              <span className="tab-text">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -151,14 +152,73 @@ export default function InputStage({
         {activeTab === 'sketch' && (
           <div className="input-body animate-slide-up">
             <WhiteboardCanvas onExportImage={(b64) => setCanvasBase64(b64)} />
-            <div className="sketch-notes-row">
-              <input
-                type="text"
-                className="input-field sketch-notes-input"
-                placeholder="(Optional) Add any notes about your sketch — e.g., 'Targeting 10k users, prefer Python for backend'..."
+
+            {/* Enhanced Architecture Notes & Constraints Box */}
+            <div className="sketch-notes-card">
+              <div className="sketch-notes-header">
+                <div className="sketch-notes-title-group">
+                  <span className="sketch-notes-icon">📝</span>
+                  <div>
+                    <div className="sketch-notes-heading">
+                      Architectural Notes & Technical Constraints <span className="optional-badge">Optional</span>
+                    </div>
+                    <div className="sketch-notes-sub">
+                      Specify scaling requirements, database preferences, auth rules, or cloud stack.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost quick-notes-dictate-btn"
+                  onClick={() => setActiveTab('voice')}
+                  title="Switch to Voice Dictation to speak your ideas"
+                >
+                  🎙️ Dictate via Voice
+                </button>
+              </div>
+
+              <textarea
+                className="input-field sketch-notes-textarea"
+                rows={3}
+                placeholder="Example: Targeting 50k DAU with high write load. Prefer Python FastAPI backend, PostgreSQL for storage, Redis for cache/rate limiting, and Docker Compose for local deployment..."
                 value={ideaText}
                 onChange={(e) => setIdeaText(e.target.value)}
               />
+
+              {/* Quick Technical Constraint Badges */}
+              <div className="notes-chips-container">
+                <span className="notes-chips-label">Quick Constraints:</span>
+                <div className="notes-chips-list">
+                  {[
+                    '+ 50k DAU High Concurrency',
+                    '+ Python FastAPI Gateway',
+                    '+ PostgreSQL + Prisma ORM',
+                    '+ Redis In-Memory Cache',
+                    '+ Zero-Trust OAuth 2.0',
+                    '+ Docker Compose Setup',
+                    '+ AWS ECS / Serverless',
+                    '+ End-to-End Encryption',
+                  ].map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className="notes-chip-pill"
+                      onClick={() => {
+                        const clean = chip.replace(/^\+\s*/, '');
+                        setIdeaText(prev => {
+                          const base = (prev || '').trim();
+                          if (!base) return clean;
+                          if (base.includes(clean)) return base;
+                          return `${base}, ${clean}`;
+                        });
+                      }}
+                      title={`Add "${chip}" to notes`}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -321,25 +381,37 @@ export default function InputStage({
 
       {/* Two-step workflow visual */}
       <div className="how-it-works animate-slide-up delay-3">
-        <p className="how-label">How the co-founder loop works:</p>
-        <div className="how-steps">
-          <div className="how-step">
-            <div className="how-step__num">1</div>
-            <div>
-              <div className="how-step__title">AI Alignment Interview</div>
-              <div className="how-step__desc">
-                The AI parses your napkin sketch or voice dictation, confirms understanding, and asks 3-4 targeted questions to lock down database, auth, and scaling choices.
-              </div>
+        <div className="how-header-row">
+          <span className="how-label">How The Technical Co-Founder Engine Works</span>
+        </div>
+        <div className="how-steps-grid">
+          <div className="how-step-card card">
+            <div className="how-step-top">
+              <span className="how-step-badge">Phase 1</span>
+              <span className="how-step-icon">🎯</span>
+            </div>
+            <h3 className="how-step__title">AI Alignment Interview</h3>
+            <p className="how-step__desc">
+              The AI parses your whiteboard napkin sketch or speech, detects architectural constraints, and asks 3-4 targeted clarifying questions to finalize database, authentication, and hosting tiers.
+            </p>
+            <div className="how-step-features">
+              <span className="how-feature-item">✓ Multimodal diagram parsing</span>
+              <span className="how-feature-item">✓ Real-time trade-off advice</span>
             </div>
           </div>
-          <div className="how-divider">⟶</div>
-          <div className="how-step">
-            <div className="how-step__num">2</div>
-            <div>
-              <div className="how-step__title">Master Production Blueprint</div>
-              <div className="how-step__desc">
-                Receive interactive topology diagrams, hosting cost breakdown, GitHub market intel, and a 1-click downloadable starter repo .zip with real code.
-              </div>
+
+          <div className="how-step-card card">
+            <div className="how-step-top">
+              <span className="how-step-badge">Phase 2</span>
+              <span className="how-step-icon">📦</span>
+            </div>
+            <h3 className="how-step__title">Master Production Blueprint</h3>
+            <p className="how-step__desc">
+              Receive interactive Mermaid topology diagrams, live AWS/Vercel/Fly.io hosting cost projections, GitHub competitive intel, and download a 1-click starter repository .zip with real code.
+            </p>
+            <div className="how-step-features">
+              <span className="how-feature-item">✓ Docker Compose + GitHub Actions</span>
+              <span className="how-feature-item">✓ 1-Click downloadable .zip bundle</span>
             </div>
           </div>
         </div>

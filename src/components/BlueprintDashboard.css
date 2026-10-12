@@ -31,9 +31,9 @@
   min-width: 260px;
 }
 .dashboard-project-name {
-  font-size: clamp(1.4rem, 2.8vw, 1.9rem);
-  font-weight: 800;
-  color: #fff;
+  font-size: clamp(1.4rem, 2.8vw, 2rem);
+  font-weight: 700;
+  color: var(--text-primary);
   letter-spacing: -0.5px;
   margin-bottom: 4px;
 }
@@ -110,12 +110,13 @@
 
 .blueprint-canvas {
   margin-bottom: 28px;
-  padding: 20px;
-  background: #060d1a;
-  border: 1px solid var(--border-bright);
-  border-radius: var(--radius-lg);
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
   overflow: hidden;
   position: relative;
+  box-shadow: var(--shadow-soft);
 }
 
 .canvas-legend {
