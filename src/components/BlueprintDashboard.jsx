@@ -198,8 +198,57 @@ export default function BlueprintDashboard({
     return `~$${cost} / mo (Gemini Flash Pay-As-You-Go)`;
   };
 
+  const defaultRoadmap = {
+    phase1: {
+      title: "MVP — Core Loop (Hackathon Sprint)",
+      duration: "2-4 hours",
+      milestones: [
+        `Scaffold ${understanding?.projectTitle || 'project'} repository, dependencies, and environment config`,
+        "Implement core API endpoints and data model schema",
+        "Build main interactive user workflow and responsive UI components",
+        "Test end-to-end data pipeline and verify state management"
+      ]
+    },
+    phase2: {
+      title: "Polish, Integration & Storage",
+      duration: "12-24 hours",
+      milestones: [
+        "Connect persistent database (PostgreSQL / SQLite) with automated migrations",
+        "Integrate caching layer (Redis) and asynchronous background tasks",
+        "Implement error handling, health checks, and responsive UI styling",
+        "Validate multimodal AI reasoning pipeline with resilient error fallbacks"
+      ]
+    },
+    phase3: {
+      title: "Production Deployment & Launch",
+      duration: "1-2 weeks",
+      milestones: [
+        "Configure Docker Compose multi-container setup and GitHub Actions CI/CD",
+        "Deploy production services to cloud host (Vercel, Render, or Fly.io)",
+        "Perform security audit, API rate limiting, and CORS verification",
+        "Publish open-source documentation, architecture diagrams, and demo video"
+      ]
+    }
+  };
+
+  const effectiveRoadmap = (blueprint?.roadmap && Object.keys(blueprint.roadmap).length > 0)
+    ? blueprint.roadmap
+    : defaultRoadmap;
+
+  const defaultResources = [
+    { title: "FastAPI Documentation", url: "https://fastapi.tiangolo.com/", description: "High-performance Python web framework for building APIs", type: "docs" },
+    { title: "React 19 & Vite Guide", url: "https://vite.dev/", description: "Next generation frontend tooling and rapid bundling", type: "docs" },
+    { title: "Google Gemini & Gemma AI API", url: "https://ai.google.dev/", description: "Multimodal generative AI SDK and models", type: "api" },
+    { title: "PostgreSQL & pgvector", url: "https://www.postgresql.org/", description: "Robust relational database with vector search extensions", type: "docs" },
+    { title: "Docker Compose Documentation", url: "https://docs.docker.com/compose/", description: "Multi-container Docker orchestration for local and production", type: "devops" }
+  ];
+
+  const effectiveResources = (blueprint?.resources && blueprint.resources.length > 0)
+    ? blueprint.resources
+    : defaultResources;
+
   // Milestone statistics
-  const totalMilestones = Object.values(blueprint?.roadmap || {}).reduce((acc, p) => acc + (p.milestones?.length || 0), 0);
+  const totalMilestones = Object.values(effectiveRoadmap).reduce((acc, p) => acc + (p.milestones?.length || 0), 0);
   const doneMilestones = completedMilestones.size;
   const progressPercent = totalMilestones > 0 ? Math.round((doneMilestones / totalMilestones) * 100) : 0;
 
@@ -630,44 +679,42 @@ export default function BlueprintDashboard({
               </div>
             </div>
 
-            {blueprint?.roadmap && (
-              <div className="roadmap-phases">
-                {Object.entries(blueprint.roadmap).map(([key, phase], i) => (
-                  <div key={key} className={`roadmap-phase card phase-${i + 1}`}>
-                    <div className="phase-header">
-                      <div className="phase-num">{`Phase ${i + 1}`}</div>
-                      <div>
-                        <div className="phase-title">{phase.title}</div>
-                        <div className="phase-duration">⏱ {phase.duration}</div>
-                      </div>
+            <div className="roadmap-phases">
+              {Object.entries(effectiveRoadmap).map(([key, phase], i) => (
+                <div key={key} className={`roadmap-phase card phase-${i + 1}`}>
+                  <div className="phase-header">
+                    <div className="phase-num">{`Phase ${i + 1}`}</div>
+                    <div>
+                      <div className="phase-title">{phase.title}</div>
+                      <div className="phase-duration">⏱ {phase.duration}</div>
                     </div>
-                    <ul className="phase-milestones-interactive">
-                      {(phase.milestones || []).map((m, mi) => {
-                        const mKey = `${key}-${mi}`;
-                        const isDone = completedMilestones.has(mKey);
-                        return (
-                          <li
-                            key={mi}
-                            className={`milestone-item ${isDone ? 'done' : ''}`}
-                            onClick={() => toggleMilestone(mKey)}
-                          >
-                            <span className="milestone-checkbox">{isDone ? '✓' : ''}</span>
-                            <span className="milestone-text">{m}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
                   </div>
-                ))}
-              </div>
-            )}
+                  <ul className="phase-milestones-interactive">
+                    {(phase.milestones || []).map((m, mi) => {
+                      const mKey = `${key}-${mi}`;
+                      const isDone = completedMilestones.has(mKey);
+                      return (
+                        <li
+                          key={mi}
+                          className={`milestone-item ${isDone ? 'done' : ''}`}
+                          onClick={() => toggleMilestone(mKey)}
+                        >
+                          <span className="milestone-checkbox">{isDone ? '✓' : ''}</span>
+                          <span className="milestone-text">{m}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
 
             {/* Official Resources & Docs */}
-            {blueprint?.resources && blueprint.resources.length > 0 && (
+            {effectiveResources.length > 0 && (
               <div className="resources-section">
                 <h4 className="section-title" style={{ marginTop: '36px' }}>📚 Official Documentation & Technical Guides</h4>
                 <div className="resources-grid">
-                  {blueprint.resources.map((res, i) => (
+                  {effectiveResources.map((res, i) => (
                     <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="resource-card card">
                       <div className="resource-header">
                         <span className={`badge badge-${res.type === 'docs' ? 'cyan' : res.type === 'api' ? 'violet' : 'green'}`}>

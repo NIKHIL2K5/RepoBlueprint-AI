@@ -97,43 +97,20 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
     setVoiceDetected(false);
   };
 
-  const startHardwareAudioLevelMeter = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) return;
+  const checkMicrophonePermission = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
     try {
+      // Test mic permission and IMMEDIATELY stop track so SpeechRecognition gets exclusive Windows mic access
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const audioCtx = new AudioCtx();
-      audioContextRef.current = audioCtx;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      const checkVolume = () => {
-        if (!shouldKeepListeningRef.current) return;
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / bufferLength;
-        const normalized = Math.min(100, Math.round((avg / 128) * 100));
-        setAudioLevel(normalized);
-        if (normalized > 8) {
-          setVoiceDetected(true);
-        }
-        animFrameRef.current = requestAnimationFrame(checkVolume);
-      };
-      animFrameRef.current = requestAnimationFrame(checkVolume);
+      stream.getTracks().forEach(t => t.stop());
+      return true;
     } catch (err) {
-      console.warn('Microphone meter initialization note:', err.message);
+      console.warn('Microphone permission notice:', err.message);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
+        return false;
+      }
+      return true;
     }
   };
 
@@ -160,9 +137,32 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
         setIsListening(true);
         setStatusMsg('');
         setErrorMsg('');
+        setVoiceDetected(true);
+      };
+
+      recognition.onaudiostart = () => {
+        setIsListening(true);
+        setVoiceDetected(true);
+      };
+
+      recognition.onsoundstart = () => {
+        setVoiceDetected(true);
+      };
+
+      recognition.onspeechstart = () => {
+        setVoiceDetected(true);
+      };
+
+      recognition.onspeechend = () => {
+        // Natural speech pause
+      };
+
+      recognition.onaudioend = () => {
+        setVoiceDetected(false);
       };
 
       recognition.onresult = (event) => {
+        setVoiceDetected(true);
         let currentFinal = '';
         let currentInterim = '';
 
@@ -192,20 +192,24 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
       };
 
       recognition.onerror = (event) => {
-        if (event.error === 'aborted' || event.error === 'no-speech') {
+        console.warn('[VoiceDictation] error event:', event.error);
+        if (event.error === 'aborted') {
+          return;
+        }
+
+        if (event.error === 'no-speech') {
           // Normal pause in speech, keep listening!
           return;
         }
-        console.warn('[VoiceDictation] error event:', event.error);
 
         if (event.error === 'not-allowed') {
           setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
           shouldKeepListeningRef.current = false;
           setIsListening(false);
         } else if (event.error === 'network') {
-          setErrorMsg(`Network issue with speech recognition for ${selectedLang.name}. You can click any test sample below.`);
+          setErrorMsg(`Google Speech Server unreachable in this session (Chrome Incognito mode automatically blocks Google speech servers for privacy). Open in standard Chrome, or click any 1-click spoken template below!`);
         } else {
-          setErrorMsg(`Voice notice: ${event.error}. You can also insert sample text below.`);
+          setErrorMsg(`Voice notice: ${event.error}. You can also click any spoken template below.`);
         }
       };
 
@@ -222,7 +226,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
           setIsListening(false);
           setInterimText('');
           setStatusMsg('');
-          stopHardwareAudio();
+          setVoiceDetected(false);
         }
       };
 
@@ -235,7 +239,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
 
   const startListening = async () => {
     setErrorMsg('');
-    setStatusMsg(`Connecting microphone in ${selectedLang.flag} ${selectedLang.native}…`);
+    setStatusMsg(`Connecting microphone for ${selectedLang.flag} ${selectedLang.native}…`);
     shouldKeepListeningRef.current = true;
 
     // Reset transcription buffers
@@ -245,8 +249,13 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
     setInterimText('');
     setVoiceDetected(false);
 
-    // Start hardware VU meter for real-time visual feedback
-    await startHardwareAudioLevelMeter();
+    // Verify mic permission and IMMEDIATELY release device stream so SpeechRecognition gets exclusive access
+    const allowed = await checkMicrophonePermission();
+    if (!allowed) {
+      shouldKeepListeningRef.current = false;
+      setStatusMsg('');
+      return;
+    }
 
     if (!SpeechRecognitionAPI) {
       setErrorMsg('Web Speech API is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
@@ -276,7 +285,6 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
       setStatusMsg('');
       shouldKeepListeningRef.current = false;
       setIsListening(false);
-      stopHardwareAudio();
     }
   };
 

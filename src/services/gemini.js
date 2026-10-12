@@ -120,7 +120,27 @@ Required JSON schema:
     "description": "Short repository description",
     "quickstartCommand": "docker compose up --build",
     "commands": ["npm install", "docker compose up"]
-  }
+  },
+  "roadmap": {
+    "phase1": {
+      "title": "MVP — Core Loop (Hackathon Sprint)",
+      "duration": "2-4 hours",
+      "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
+    },
+    "phase2": {
+      "title": "Polish, Integration & Storage",
+      "duration": "12-24 hours",
+      "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
+    },
+    "phase3": {
+      "title": "Production Deployment & Launch",
+      "duration": "1-2 weeks",
+      "milestones": ["Milestone 1", "Milestone 2", "Milestone 3"]
+    }
+  },
+  "resources": [
+    { "title": "Resource Name", "url": "https://example.com", "description": "Resource purpose", "type": "docs|api|library|devops" }
+  ]
 }`;
 
   try {
@@ -500,7 +520,46 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
         'cd ' + slug + '-starter',
         'docker compose up --build'
       ]
-    }
+    },
+    roadmap: {
+      phase1: {
+        title: "MVP — Core Loop (Hackathon Sprint)",
+        duration: "2-4 hours",
+        milestones: [
+          `Scaffold ${title} monorepo with Vite React and FastAPI`,
+          "Implement core endpoints and PostgreSQL relational schema",
+          "Build main user workflow and responsive UI interface",
+          "Verify end-to-end API communication and state management"
+        ]
+      },
+      phase2: {
+        title: "Polish, Integration & Storage",
+        duration: "12-24 hours",
+        milestones: [
+          "Connect PostgreSQL database with automated Alembic migrations",
+          "Integrate Redis caching and async background task queue",
+          "Implement robust error boundaries, health checks, and responsive UI",
+          "Connect multimodal AI reasoning engine with graceful fallbacks"
+        ]
+      },
+      phase3: {
+        title: "Production Deployment & Launch",
+        duration: "1-2 weeks",
+        milestones: [
+          "Configure Docker Compose containerization and GitHub Actions CI/CD",
+          "Deploy production build to Vercel/Render with environment secrets",
+          "Perform API security audits and rate limiting configuration",
+          "Publish open-source repository documentation and demo video"
+        ]
+      }
+    },
+    resources: [
+      { title: "FastAPI Documentation", url: "https://fastapi.tiangolo.com/", description: "High-performance Python web framework for building APIs", type: "docs" },
+      { title: "React 19 & Vite Guide", url: "https://vite.dev/", description: "Next generation frontend tooling and rapid bundling", type: "docs" },
+      { title: "Google Gemini & Gemma AI API", url: "https://ai.google.dev/", description: "Multimodal generative AI SDK and models", type: "api" },
+      { title: "PostgreSQL Documentation", url: "https://www.postgresql.org/", description: "Robust relational database with vector search extensions", type: "docs" },
+      { title: "Docker Compose Documentation", url: "https://docs.docker.com/compose/", description: "Multi-container Docker orchestration for local and production", type: "devops" }
+    ]
   };
 }
 
