@@ -71,6 +71,18 @@ function buildSystemPrompt(appContext = {}) {
     if (appContext.understanding.identifiedComponents?.length) {
       contextDetails += `KEY ARCHITECTURE COMPONENTS: ${appContext.understanding.identifiedComponents.map(c => `${c.name} (${c.role})`).join('; ')}\n`;
     }
+    if (appContext.understanding.prosAndCons?.pros?.length) {
+      contextDetails += `ARCHITECTURAL PROS: ${appContext.understanding.prosAndCons.pros.map(p => `${p.title} (${p.badge}): ${p.detail}`).join('; ')}\n`;
+    }
+    if (appContext.understanding.prosAndCons?.cons?.length) {
+      contextDetails += `ARCHITECTURAL CONS & MITIGATIONS: ${appContext.understanding.prosAndCons.cons.map(c => `${c.title} (${c.badge}): ${c.detail} [Mitigation: ${c.mitigation}]`).join('; ')}\n`;
+    }
+    if (appContext.understanding.similarWebsites?.length) {
+      contextDetails += `SIMILAR WEBSITES ON THE WEB: ${appContext.understanding.similarWebsites.map(w => `${w.name} (${w.category}) - ${w.description} [Moat: ${w.moat}]`).join('; ')}\n`;
+    }
+    if (appContext.understanding.openSourceProjects?.length) {
+      contextDetails += `SIMILAR OPEN SOURCE PROJECTS: ${appContext.understanding.openSourceProjects.map(o => `${o.name} (${o.repo}, ${o.stars}): ${o.description}`).join('; ')}\n`;
+    }
   }
 
   if (stage === 'input') {
@@ -397,6 +409,64 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
         };
       }
     }
+  }
+
+  // GLOBAL: Explain Idea, Key Features, Pros & Cons, Similar Websites & Open Source
+  if (
+    q.includes('what is my idea') ||
+    q.includes('explain my idea') ||
+    q.includes('what did i tell you') ||
+    q.includes('tell me what my idea is') ||
+    q.includes('tell what my idea is') ||
+    q.includes('what my idea is') ||
+    q.includes('check the blueprint') ||
+    q.includes('explain the idea') ||
+    q.includes('key feature') ||
+    q.includes('features') ||
+    q.includes('pros and cons') ||
+    q.includes('trade-off') ||
+    q.includes('similar website') ||
+    q.includes('competitor') ||
+    q.includes('open source') ||
+    q.includes('github repo') ||
+    (q.includes('my idea') && (q.includes('what') || q.includes('tell') || q.includes('check') || q.includes('explain') || q.includes('can you')))
+  ) {
+    const title = appContext.understanding?.projectTitle || 'Production System';
+    const idea = appContext.ideaText || appContext.understanding?.corePurpose || appContext.understanding?.oneLiner || 'your project idea';
+    const purpose = appContext.understanding?.corePurpose || '';
+    const actors = (appContext.understanding?.keyActors || []).join(', ');
+    const components = (appContext.understanding?.identifiedComponents || []).map(c => `• **${c.name}**: ${c.role}`).join('\n');
+    const features = (appContext.understanding?.innovationSuggestions || []).map(f => `• **${f.title}**: ${f.description}`).join('\n');
+    
+    // Pros & Cons
+    const pros = (appContext.understanding?.prosAndCons?.pros || []).map(p => `• **${p.title}** (${p.badge}): ${p.detail}`).join('\n');
+    const cons = (appContext.understanding?.prosAndCons?.cons || []).map(c => `• **${c.title}** (${c.badge}): ${c.detail}\n  ↳ *Mitigation*: ${c.mitigation}`).join('\n');
+    
+    // Websites
+    const websites = (appContext.understanding?.similarWebsites || []).map(w => `• [${w.name}](${w.url}) (${w.category}): ${w.description} — *Moat*: ${w.moat}`).join('\n');
+    
+    // Open Source
+    const oss = (appContext.understanding?.openSourceProjects || []).map(o => `• [${o.name}](https://github.com/${o.repo}) (${o.repo}, ${o.stars}): ${o.description}`).join('\n');
+
+    let responseText = `Here is the comprehensive architectural breakdown of your idea, market landscape, and open-source foundations:\n\n` +
+      `🎯 **Project Title**: **${title}**\n` +
+      `📝 **Idea Description**: "${idea}"\n\n` +
+      (purpose ? `💡 **Core Purpose**: ${purpose}\n\n` : '') +
+      (actors ? `👥 **Key Target Users / Actors**: ${actors}\n\n` : '');
+
+    if (pros) responseText += `✅ **Key Architectural Pros**:\n${pros}\n\n`;
+    if (cons) responseText += `⚠️ **Technical Bottlenecks & Engineering Mitigations (Cons)**:\n${cons}\n\n`;
+    if (websites) responseText += `🌐 **Similar Websites Over The Web**:\n${websites}\n\n`;
+    if (oss) responseText += `🐙 **Top Open-Source Projects (GitHub)**:\n${oss}\n\n`;
+    if (features) responseText += `🚀 **Key Innovation Advantages**:\n${features}\n\n`;
+    if (components) responseText += `🏗️ **Key Architectural Components**:\n${components}\n\n`;
+
+    return {
+      text: responseText,
+      action: stage === 'alignment'
+        ? { type: 'CONFIRM_ALIGNMENT', params: {}, label: '🚀 Generate Master Architecture Blueprint' }
+        : { type: 'SWITCH_DASHBOARD_TAB', params: { tab: 'blueprint' }, label: '🌐 View System Topology' }
+    };
   }
 
   // 1. STAGE: INPUT

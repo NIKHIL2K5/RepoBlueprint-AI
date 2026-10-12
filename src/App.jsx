@@ -586,6 +586,7 @@ export default function App() {
           {appState === STATE.ALIGN && understanding && (
             <AlignmentPhase
               understanding={understanding}
+              onUpdateUnderstanding={setUnderstanding}
               onConfirm={handleAlignmentConfirm}
               onBack={handleReset}
               answers={alignmentAnswers}
