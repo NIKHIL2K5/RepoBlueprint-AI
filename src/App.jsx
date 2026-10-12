@@ -37,6 +37,20 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
+  // Saved projects history and active project tracking with localStorage
+  const [savedProjects, setSavedProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('rb_saved_projects');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    return localStorage.getItem('rb_active_project_id') || '';
+  });
+
   const [appState,      setAppState]      = useState(config ? STATE.INPUT : STATE.SETUP);
   const [loadingStage,  setLoadingStage]  = useState(0);
   const [understanding, setUnderstanding] = useState(null);
@@ -44,13 +58,40 @@ export default function App() {
   const [error,         setError]         = useState('');
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
 
-  // Controlled states for deep Copilot action interaction
-  const [inputIdeaText,    setInputIdeaText]    = useState('');
+  // Controlled states for deep Copilot action interaction with draft persistence
+  const [inputIdeaText,    setInputIdeaText]    = useState(() => {
+    try {
+      return localStorage.getItem('rb_draft_idea') || '';
+    } catch {
+      return '';
+    }
+  });
   const [inputTab,         setInputTab]         = useState('sketch');
   const [alignmentAnswers, setAlignmentAnswers] = useState({});
   const [alignmentNotes,   setAlignmentNotes]   = useState('');
   const [dashboardTab,     setDashboardTab]     = useState('blueprint');
   const [estimatedDau,     setEstimatedDau]     = useState(5000);
+
+  const handleIdeaTextChange = (text) => {
+    setInputIdeaText(text);
+    try {
+      localStorage.setItem('rb_draft_idea', text);
+    } catch (e) {
+      console.warn('Failed to save draft:', e);
+    }
+  };
+
+  // Restore active project on mount if previously viewed
+  useEffect(() => {
+    if (activeProjectId && savedProjects.length > 0) {
+      const active = savedProjects.find(p => p.id === activeProjectId);
+      if (active && active.blueprint && active.understanding) {
+        setUnderstanding(active.understanding);
+        setBlueprint(active.blueprint);
+        if (config) setAppState(STATE.DASH);
+      }
+    }
+  }, []);
 
   const handleSetupComplete = (cfg) => {
     localStorage.setItem('rb_config', JSON.stringify(cfg));
@@ -87,6 +128,33 @@ export default function App() {
       clearInterval(stageTimer);
       setLoadingStage(6);
       setBlueprint(result);
+
+      // Save new project to history and active state in localStorage
+      const projectId = 'proj_' + Date.now();
+      const newProject = {
+        id: projectId,
+        title: result.repoName || understanding.projectTitle || 'Production Blueprint',
+        tag: result.techStack?.backend?.name?.split(' ')[0] || result.techStack?.frontend?.name?.split(' ')[0] || 'Fullstack',
+        date: new Date().toISOString(),
+        ideaText: inputIdeaText,
+        understanding,
+        blueprint: result,
+      };
+
+      setSavedProjects(prev => {
+        const updated = [newProject, ...prev.filter(p => p.title !== newProject.title && p.id !== projectId)];
+        try {
+          localStorage.setItem('rb_saved_projects', JSON.stringify(updated.slice(0, 50)));
+        } catch (e) {
+          console.warn('Failed to save project:', e);
+        }
+        return updated;
+      });
+      setActiveProjectId(projectId);
+      try {
+        localStorage.setItem('rb_active_project_id', projectId);
+      } catch {}
+
       setTimeout(() => setAppState(STATE.DASH), 500);
     } catch (err) {
       clearInterval(stageTimer);
@@ -99,7 +167,68 @@ export default function App() {
     setAppState(STATE.INPUT);
     setUnderstanding(null);
     setBlueprint(null);
+    setActiveProjectId('');
+    try {
+      localStorage.removeItem('rb_active_project_id');
+    } catch {}
     setError('');
+  };
+
+  const handleSelectProject = (item) => {
+    if (!item) return;
+
+    // 1. Saved custom project
+    const match = savedProjects.find(p => p.id === item.id);
+    if (match && match.blueprint && match.understanding) {
+      setUnderstanding(match.understanding);
+      setBlueprint(match.blueprint);
+      setInputIdeaText(match.ideaText || match.title || '');
+      setActiveProjectId(match.id);
+      try {
+        localStorage.setItem('rb_active_project_id', match.id);
+      } catch {}
+      setAppState(STATE.DASH);
+      return;
+    }
+
+    // 2. Preset reference project
+    const sample = SAMPLE_IDEAS.find(s => s.id === item.id || s.id.includes(item.id) || item.id.includes(s.id));
+    if (sample && sample.sampleBlueprint && sample.sampleUnderstanding) {
+      setUnderstanding(sample.sampleUnderstanding);
+      setBlueprint(sample.sampleBlueprint);
+      setInputIdeaText(sample.text || '');
+      setActiveProjectId(sample.id);
+      try {
+        localStorage.setItem('rb_active_project_id', sample.id);
+      } catch {}
+      setAppState(STATE.DASH);
+      return;
+    }
+
+    // 3. Fallback to default
+    if (SAMPLE_IDEAS[0]) {
+      setUnderstanding(SAMPLE_IDEAS[0].sampleUnderstanding);
+      setBlueprint(SAMPLE_IDEAS[0].sampleBlueprint);
+      setInputIdeaText(SAMPLE_IDEAS[0].text || '');
+      setActiveProjectId(SAMPLE_IDEAS[0].id);
+      try {
+        localStorage.setItem('rb_active_project_id', SAMPLE_IDEAS[0].id);
+      } catch {}
+      setAppState(STATE.DASH);
+    }
+  };
+
+  const handleDeleteProject = (projectId) => {
+    setSavedProjects(prev => {
+      const updated = prev.filter(p => p.id !== projectId);
+      try {
+        localStorage.setItem('rb_saved_projects', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (activeProjectId === projectId) {
+      handleReset();
+    }
   };
 
   const handleLogout = () => {
@@ -125,7 +254,7 @@ export default function App() {
     switch (action.type) {
       case 'FILL_IDEA':
         if (action.params?.text) {
-          setInputIdeaText(action.params.text);
+          handleIdeaTextChange(action.params.text);
           setInputTab('text');
           if (appState !== STATE.INPUT) setAppState(STATE.INPUT);
         }
@@ -133,7 +262,7 @@ export default function App() {
 
       case 'APPEND_IDEA':
         if (action.params?.text) {
-          setInputIdeaText(prev => (prev ? prev + '\n\n' + action.params.text : action.params.text));
+          handleIdeaTextChange(inputIdeaText ? inputIdeaText + '\n\n' + action.params.text : action.params.text);
           if (appState !== STATE.INPUT) setAppState(STATE.INPUT);
         }
         break;
@@ -241,6 +370,20 @@ export default function App() {
             updated.mermaidDiagram = diagram;
           }
 
+          // Persist updated blueprint to saved projects
+          setSavedProjects(projects => {
+            const updatedProjects = projects.map(p => {
+              if (p.id === activeProjectId || (!activeProjectId && p.title === updated.repoName)) {
+                return { ...p, blueprint: updated };
+              }
+              return p;
+            });
+            try {
+              localStorage.setItem('rb_saved_projects', JSON.stringify(updatedProjects));
+            } catch {}
+            return updatedProjects;
+          });
+
           return updated;
         });
         break;
@@ -310,7 +453,10 @@ export default function App() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(prev => !prev)}
         onNewProject={handleReset}
-        onSelectProject={() => {}}
+        onSelectProject={handleSelectProject}
+        onDeleteProject={handleDeleteProject}
+        activeProjectId={activeProjectId}
+        savedProjects={savedProjects}
         config={config}
         onOpenSettings={handleLogout}
       />
@@ -373,7 +519,7 @@ export default function App() {
             <InputStage
               onSubmit={handleIdeaSubmit}
               ideaText={inputIdeaText}
-              onIdeaTextChange={setInputIdeaText}
+              onIdeaTextChange={handleIdeaTextChange}
               activeTab={inputTab}
               onActiveTabChange={setInputTab}
             />

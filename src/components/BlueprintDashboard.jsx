@@ -75,8 +75,24 @@ export default function BlueprintDashboard({
   const estimatedDau = externalDau !== undefined ? externalDau : internalDau;
   const setEstimatedDau = onDauChange || setInternalDau;
 
-  // Interactive Sprint checklist state
-  const [completedMilestones, setCompletedMilestones] = useState(() => new Set());
+  // Interactive Sprint checklist state with localStorage persistence
+  const projectKey = (blueprint?.repoName || understanding?.projectTitle || 'default').replace(/\s+/g, '_');
+  const [completedMilestones, setCompletedMilestones] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`rb_roadmap_${projectKey}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Sync completed milestones when project changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`rb_roadmap_${projectKey}`);
+      setCompletedMilestones(saved ? new Set(JSON.parse(saved)) : new Set());
+    } catch {}
+  }, [projectKey]);
 
   const mermaidRef = useRef(null);
 
@@ -172,6 +188,11 @@ export default function BlueprintDashboard({
       const next = new Set(prev);
       if (next.has(milestoneKey)) next.delete(milestoneKey);
       else next.add(milestoneKey);
+      try {
+        localStorage.setItem(`rb_roadmap_${projectKey}`, JSON.stringify([...next]));
+      } catch (err) {
+        console.warn('Failed to save roadmap progress:', err);
+      }
       return next;
     });
   };
