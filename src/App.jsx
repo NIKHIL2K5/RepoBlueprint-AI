@@ -196,6 +196,56 @@ export default function App() {
         }
         break;
 
+      case 'UPDATE_TECH_STACK':
+      case 'MODIFY_BLUEPRINT': {
+        const { layer, name, reason, alternatives, mermaidOld, mermaidNew } = action.params || {};
+        setBlueprint(prev => {
+          if (!prev) return prev;
+          const updated = { ...prev };
+
+          // Update techStack specifications
+          if (layer && updated.techStack) {
+            updated.techStack = {
+              ...updated.techStack,
+              [layer]: {
+                name: name || updated.techStack[layer]?.name,
+                reason: reason || updated.techStack[layer]?.reason || 'Updated based on architectural requirement.',
+                alternatives: alternatives || updated.techStack[layer]?.alternatives || []
+              }
+            };
+          }
+
+          // Live update Mermaid topology diagram so the visual architecture reflects the change!
+          if (updated.mermaidDiagram) {
+            let diagram = updated.mermaidDiagram;
+            if (mermaidOld && mermaidNew) {
+              diagram = diagram.replaceAll(mermaidOld, mermaidNew);
+            } else if (layer === 'database') {
+              const newDb = name || 'MongoDB Atlas (NoSQL)';
+              diagram = diagram
+                .replace(/PostgreSQL\s*\([^)\n]*\)/gi, `${newDb}`)
+                .replace(/PostgreSQL/gi, newDb)
+                .replace(/Postgres/gi, newDb)
+                .replace(/MySQL/gi, newDb);
+            } else if (layer === 'backend') {
+              const newBack = name || 'Node.js (API Gateway)';
+              diagram = diagram
+                .replace(/FastAPI\s*\([^)\n]*\)/gi, newBack)
+                .replace(/FastAPI/gi, newBack);
+            } else if (layer === 'frontend') {
+              const newFront = name || 'Next.js 15';
+              diagram = diagram
+                .replace(/React\s*19\s*\+\s*Vite/gi, newFront)
+                .replace(/React/gi, newFront);
+            }
+            updated.mermaidDiagram = diagram;
+          }
+
+          return updated;
+        });
+        break;
+      }
+
       case 'SET_DAU':
         if (action.params?.dau) {
           setEstimatedDau(action.params.dau);

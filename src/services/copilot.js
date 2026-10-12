@@ -124,6 +124,7 @@ Supported Action Types:
 10. "SET_DAU": params: { "dau": 25000 } — Adjusts cost calculator slider.
 11. "DOWNLOAD_REPO": params: {} — Downloads starter repo .zip bundle.
 12. "SWITCH_TO_DEMO": params: {} — Launches instant demo mode.
+13. "UPDATE_TECH_STACK": params: { "layer": "database" | "backend" | "frontend" | "ai" | "devops", "name": "New Tech Name", "reason": "Specific technical justification", "alternatives": ["Alt 1", "Alt 2"], "mermaidOld": "Old text to replace", "mermaidNew": "New text in diagram" } — Live updates the architecture diagram, tech stack specifications, and data persistence layer on the screen.
 
 Only provide an action tag when an action is appropriate. Make sure the action JSON is strictly valid.`;
 }
@@ -223,7 +224,7 @@ export function parseCopilotResponse(rawText) {
 
   // Pattern 2: Search for balanced curly braces around any action "type": "..."
   if (!action) {
-    const typeKeywordIdx = cleanText.search(/"type"\s*:\s*"(FILL_IDEA|APPEND_IDEA|SWITCH_INPUT_TAB|LOAD_SAMPLE|SUBMIT_IDEA|SELECT_ALIGNMENT_ANSWER|SET_ALIGNMENT_NOTES|CONFIRM_ALIGNMENT|SWITCH_DASHBOARD_TAB|SET_DAU|DOWNLOAD_REPO|SWITCH_TO_DEMO)"/);
+    const typeKeywordIdx = cleanText.search(/"type"\s*:\s*"(FILL_IDEA|APPEND_IDEA|SWITCH_INPUT_TAB|LOAD_SAMPLE|SUBMIT_IDEA|SELECT_ALIGNMENT_ANSWER|SET_ALIGNMENT_NOTES|CONFIRM_ALIGNMENT|SWITCH_DASHBOARD_TAB|SET_DAU|DOWNLOAD_REPO|SWITCH_TO_DEMO|UPDATE_TECH_STACK|MODIFY_BLUEPRINT)"/);
     if (typeKeywordIdx !== -1) {
       const openIdx = cleanText.lastIndexOf('{', typeKeywordIdx);
       if (openIdx !== -1) {
@@ -267,6 +268,44 @@ export function parseCopilotResponse(rawText) {
     .replace(/^\s*>>+.*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // Smart Detection: If assistant response or query discusses shifting to NoSQL / MongoDB
+  const textLower = cleanText.toLowerCase();
+  if (
+    (!action || action.type === 'SWITCH_DASHBOARD_TAB') &&
+    (textLower.includes('nosql') || textLower.includes('mongodb') || textLower.includes('shifted towards a more flexible'))
+  ) {
+    action = {
+      type: 'UPDATE_TECH_STACK',
+      params: {
+        layer: 'database',
+        name: 'MongoDB Atlas 7.0 (NoSQL)',
+        reason: 'Flexible JSON document schemas, high-throughput writes, and horizontal sharding for modern applications.',
+        alternatives: ['PostgreSQL 16', 'DynamoDB', 'Supabase'],
+        mermaidOld: 'PostgreSQL',
+        mermaidNew: 'MongoDB Atlas (NoSQL Document Store)'
+      },
+      label: '🗄️ Switch Architecture to MongoDB (NoSQL)'
+    };
+  } else if (
+    (!action || action.type === 'SWITCH_DASHBOARD_TAB') &&
+    (textLower.includes('postgresql') || textLower.includes('postgres') || textLower.includes('relational acid')) &&
+    (textLower.includes('switch') || textLower.includes('change') || textLower.includes('selected') || textLower.includes('primary acid'))
+  ) {
+    action = {
+      type: 'UPDATE_TECH_STACK',
+      params: {
+        layer: 'database',
+        name: 'PostgreSQL 16',
+        reason: 'Battle-tested relational ACID transactions, JSONB document fields, and connection pooling.',
+        alternatives: ['MongoDB Atlas', 'MySQL 8'],
+        mermaidOld: 'MongoDB',
+        mermaidNew: 'PostgreSQL (Primary ACID)'
+      },
+      label: '🗄️ Switch Architecture to PostgreSQL 16'
+    };
+  }
+
   // Ensure default label if missing
   if (action && !action.label) {
     action.label = getDefaultActionLabel(action);
@@ -289,6 +328,7 @@ function getDefaultActionLabel(action) {
     case 'CONFIRM_ALIGNMENT': return '🚀 Generate Master Blueprint';
     case 'SWITCH_DASHBOARD_TAB': return `🌐 Open ${action.params?.tab || 'Tab'}`;
     case 'SET_DAU': return `💰 Scale to ${(action.params?.dau || 0).toLocaleString()} DAU`;
+    case 'UPDATE_TECH_STACK': return `🗄️ Update Architecture to ${action.params?.name || 'Selected Tech'}`;
     case 'DOWNLOAD_REPO': return '📦 Download Starter Repo .zip';
     case 'SWITCH_TO_DEMO': return '⚡ Launch Instant Demo';
     default: return '⚡ Apply Page Action';
@@ -425,6 +465,42 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
           type: 'SWITCH_DASHBOARD_TAB',
           params: { tab: 'cost' },
           label: '💰 View Cloud Cost Calculator'
+        }
+      };
+    }
+
+    if (q.includes('nosql') || q.includes('mongo') || (q.includes('db') && q.includes('no')) || (q.includes('database') && q.includes('no'))) {
+      return {
+        text: `I have updated your architecture! Switched the primary database from PostgreSQL to **MongoDB Atlas (NoSQL)**. The live system topology diagram and tech stack specifications on your screen now reflect flexible JSON document collections and horizontal sharding.`,
+        action: {
+          type: 'UPDATE_TECH_STACK',
+          params: {
+            layer: 'database',
+            name: 'MongoDB Atlas 7.0 (NoSQL)',
+            reason: 'Flexible JSON document schemas, rapid schema iteration without rigid migrations, and high-throughput write scalability.',
+            alternatives: ['PostgreSQL 16', 'DynamoDB', 'Supabase'],
+            mermaidOld: 'PostgreSQL',
+            mermaidNew: 'MongoDB Atlas (NoSQL Document Store)'
+          },
+          label: '🗄️ Switch Architecture to MongoDB (NoSQL)'
+        }
+      };
+    }
+
+    if (q.includes('postgres') || q.includes('postgresql') || (q.includes('db') && q.includes('sql')) || (q.includes('database') && q.includes('sql'))) {
+      return {
+        text: `I have updated your architecture! Switched the primary database to **PostgreSQL 16**. The live system topology diagram and tech stack specifications now reflect ACID transactions, relational foreign keys, and pgvector embeddings.`,
+        action: {
+          type: 'UPDATE_TECH_STACK',
+          params: {
+            layer: 'database',
+            name: 'PostgreSQL 16',
+            reason: 'ACID transactional guarantees, relational integrity, robust indexing, and seamless pgvector AI search.',
+            alternatives: ['MongoDB Atlas', 'MySQL 8'],
+            mermaidOld: 'MongoDB',
+            mermaidNew: 'PostgreSQL (Primary ACID)'
+          },
+          label: '🗄️ Switch Architecture to PostgreSQL 16'
         }
       };
     }
