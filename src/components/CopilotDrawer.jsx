@@ -32,6 +32,7 @@ const STAGE_QUICK_ACTIONS = {
     { text: '🚀 Generate Master Blueprint', query: 'Everything looks good, generate the master architecture blueprint' },
   ],
   dashboard: [
+    { text: '📱 Convert to Mobile App', query: 'change the web to mobile app in architecture and tech stack' },
     { text: '🗄️ Switch DB to MongoDB', query: 'change the db to mongodb or oracle' },
     { text: '🎯 Explain my idea & features', query: 'Can you explain what my idea is and what are the key features?' },
     { text: '📦 Download Starter Repo .zip', query: 'Download the starter repository zip bundle now' },

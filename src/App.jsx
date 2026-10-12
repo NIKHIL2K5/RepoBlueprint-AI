@@ -335,10 +335,27 @@ export default function App() {
 
       case 'UPDATE_TECH_STACK':
       case 'MODIFY_BLUEPRINT': {
-        const { title, layer, name, reason, alternatives, mermaidOld, mermaidNew } = action.params || {};
+        const { title, layer, name, reason, alternatives, mermaidOld, mermaidNew, updates } = action.params || {};
 
         if (title) {
           setUnderstanding(u => u ? { ...u, projectTitle: title } : u);
+        }
+
+        const layerList = updates || (layer ? [{ layer, name, reason, alternatives, mermaidOld, mermaidNew }] : []);
+
+        // If converting to mobile, also update understanding identified components
+        if (layerList.some(item => item.layer === 'frontend' && (item.name?.toLowerCase().includes('mobile') || item.name?.toLowerCase().includes('react native') || item.name?.toLowerCase().includes('flutter')))) {
+          setUnderstanding(u => {
+            if (!u || !u.identifiedComponents) return u;
+            return {
+              ...u,
+              identifiedComponents: u.identifiedComponents.map(c =>
+                c.type === 'frontend' || c.name.toLowerCase().includes('web')
+                  ? { ...c, name: 'Mobile App Client (React Native iOS & Android)', role: 'Cross-platform native mobile application with touch navigation, offline cache, and native device sensor integration' }
+                  : c
+              )
+            };
+          });
         }
 
         setBlueprint(prev => {
@@ -349,41 +366,60 @@ export default function App() {
             updated.repoName = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
           }
 
-          // Update techStack specifications
-          if (layer && updated.techStack) {
-            updated.techStack = {
-              ...updated.techStack,
-              [layer]: {
-                name: name || updated.techStack[layer]?.name,
-                reason: reason || updated.techStack[layer]?.reason || 'Updated based on architectural requirement.',
-                alternatives: alternatives || updated.techStack[layer]?.alternatives || []
+          let diagram = updated.mermaidDiagram || '';
+
+          for (const item of layerList) {
+            const { layer: l, name: n, reason: r, alternatives: a, mermaidOld: mOld, mermaidNew: mNew } = item;
+
+            // Update techStack specifications
+            if (l && updated.techStack) {
+              updated.techStack = {
+                ...updated.techStack,
+                [l]: {
+                  name: n || updated.techStack[l]?.name,
+                  reason: r || updated.techStack[l]?.reason || 'Updated based on architectural requirement.',
+                  alternatives: a || updated.techStack[l]?.alternatives || []
+                }
+              };
+            }
+
+            // Live update Mermaid topology diagram so visual architecture reflects the change!
+            if (diagram) {
+              if (mOld && mNew) {
+                diagram = diagram.replaceAll(mOld, mNew);
               }
-            };
+              if (l === 'database') {
+                const newDb = n || 'MongoDB Atlas (NoSQL)';
+                diagram = diagram
+                  .replace(/PostgreSQL\s*\([^)\n]*\)/gi, `${newDb}`)
+                  .replace(/PostgreSQL/gi, newDb)
+                  .replace(/Postgres/gi, newDb)
+                  .replace(/MySQL/gi, newDb);
+              } else if (l === 'backend') {
+                const newBack = n || 'Node.js (API Gateway)';
+                diagram = diagram
+                  .replace(/FastAPI\s*\([^)\n]*\)/gi, newBack)
+                  .replace(/FastAPI/gi, newBack);
+              } else if (l === 'frontend') {
+                const newFront = n || 'React Native (Expo SDK 52)';
+                const isMobile = newFront.toLowerCase().includes('react native') || newFront.toLowerCase().includes('mobile') || newFront.toLowerCase().includes('flutter') || newFront.toLowerCase().includes('expo');
+                if (isMobile) {
+                  diagram = diagram
+                    .replace(/UI\["[^"\n]*"\]/g, `UI["📱 Mobile App Client<br/>(${newFront})"]`)
+                    .replace(/💻\s*Web(?:\s*\/\s*Mobile)?\s*UI/gi, '📱 Native Mobile App')
+                    .replace(/React\s*19\s*\+\s*Vite(?:\s*\+\s*Tailwind)?/gi, newFront)
+                    .replace(/React\s*19\s*\+\s*Vite/gi, newFront)
+                    .replace(/React\s*\+\s*Vite/gi, newFront);
+                } else {
+                  diagram = diagram
+                    .replace(/React\s*19\s*\+\s*Vite/gi, newFront)
+                    .replace(/React/gi, newFront);
+                }
+              }
+            }
           }
 
-          // Live update Mermaid topology diagram so the visual architecture reflects the change!
-          if (updated.mermaidDiagram) {
-            let diagram = updated.mermaidDiagram;
-            if (mermaidOld && mermaidNew) {
-              diagram = diagram.replaceAll(mermaidOld, mermaidNew);
-            } else if (layer === 'database') {
-              const newDb = name || 'MongoDB Atlas (NoSQL)';
-              diagram = diagram
-                .replace(/PostgreSQL\s*\([^)\n]*\)/gi, `${newDb}`)
-                .replace(/PostgreSQL/gi, newDb)
-                .replace(/Postgres/gi, newDb)
-                .replace(/MySQL/gi, newDb);
-            } else if (layer === 'backend') {
-              const newBack = name || 'Node.js (API Gateway)';
-              diagram = diagram
-                .replace(/FastAPI\s*\([^)\n]*\)/gi, newBack)
-                .replace(/FastAPI/gi, newBack);
-            } else if (layer === 'frontend') {
-              const newFront = name || 'Next.js 15';
-              diagram = diagram
-                .replace(/React\s*19\s*\+\s*Vite/gi, newFront)
-                .replace(/React/gi, newFront);
-            }
+          if (diagram) {
             updated.mermaidDiagram = diagram;
           }
 

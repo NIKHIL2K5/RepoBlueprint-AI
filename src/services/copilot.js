@@ -150,7 +150,7 @@ async function callOllamaChat(config, systemPrompt, history, userMessage, appCon
   // Build compact system instructions for snappy local CPU inference
   const stage = appContext?.stage || 'dashboard';
   const projectTitle = appContext?.understanding?.projectTitle || 'Production System';
-  const compactSystem = `${systemPrompt.slice(0, 700)}\nCURRENT_STAGE: ${stage.toUpperCase()}\nPROJECT: "${projectTitle}"`;
+  const compactSystem = `${systemPrompt.slice(0, 600)}\nCURRENT_STAGE: ${stage.toUpperCase()}\nPROJECT: "${projectTitle}"\nIMPORTANT: If user asks to change or convert to mobile app (React Native / iOS / Android), include <<<ACTION>>>{"type": "UPDATE_TECH_STACK", "params": {"layer": "frontend", "name": "React Native (Expo SDK 52)", "reason": "Cross-platform iOS and Android mobile app"}, "label": "📱 Convert to Mobile App (React Native)"}<<<ENDACTION>>>.`;
 
   // Build messages array for proper multi-turn chat API
   const messages = [
@@ -320,6 +320,22 @@ export function parseCopilotResponse(rawText) {
         mermaidNew: 'PostgreSQL (Primary ACID)'
       },
       label: '🗄️ Switch Architecture to PostgreSQL 16'
+    };
+  } else if (
+    (!action || action.type === 'SWITCH_DASHBOARD_TAB') &&
+    (textLower.includes('react native') || textLower.includes('mobile app') || textLower.includes('mobile-first') || textLower.includes('converting to mobile') || textLower.includes('transform our project into a mobile app') || textLower.includes('switching to mobile app') || textLower.includes('movile app'))
+  ) {
+    action = {
+      type: 'UPDATE_TECH_STACK',
+      params: {
+        layer: 'frontend',
+        name: 'React Native (Expo SDK 52)',
+        reason: 'Cross-platform native iOS & Android application with touch interactions, push notifications, and offline SQLite caching.',
+        alternatives: ['Flutter 3.24', 'SwiftUI (iOS)', 'Kotlin Multiplatform'],
+        mermaidOld: 'Web / Mobile UI\n(React 19 + Vite + Tailwind)',
+        mermaidNew: 'Mobile App Client (iOS & Android)\n(React Native + Expo SDK 52)'
+      },
+      label: '📱 Convert Architecture to Mobile App (React Native)'
     };
   }
 
@@ -613,6 +629,38 @@ function generateOfflineCopilotResponse(query, appContext = {}) {
             mermaidNew: 'PostgreSQL (Primary ACID)'
           },
           label: '🗄️ Switch Architecture to PostgreSQL 16'
+        }
+      };
+    }
+
+    // Mobile App Conversion (React Native / iOS / Android)
+    if (
+      q.includes('movile') ||
+      q.includes('mobile') ||
+      q.includes('react native') ||
+      q.includes('flutter') ||
+      q.includes('ios') ||
+      q.includes('android') ||
+      (q.includes('web to') && (q.includes('app') || q.includes('mobile') || q.includes('movile'))) ||
+      ((q.includes('change') || q.includes('convert') || q.includes('switch') || q.includes('yes')) && (q.includes('archctiure') || q.includes('architecture') || q.includes('stack') || q.includes('tech')) && (q.includes('mobile') || q.includes('movile') || q.includes('app')))
+    ) {
+      return {
+        text: `I have updated your system architecture and tech stack to a **Cross-Platform Mobile App (React Native + Expo SDK 52)**!\n\n` +
+          `📱 **Frontend Client Tier**: Converted from Web UI to **React Native (Expo SDK 52)** with native touch gestures and offline SQLite caching.\n` +
+          `⚡ **System Topology Diagram**: The live Mermaid graph on your screen now displays the **Native Mobile Client Tier** (iOS & Android) connecting to your API Gateway.\n` +
+          `⚙️ **Tech Stack**: Specifications have been updated with mobile libraries (React Navigation 7, Redux Toolkit, and Detox E2E testing).\n` +
+          `🗄️ **Data Persistence**: Fully integrated with your **MongoDB Atlas** document store.`,
+        action: {
+          type: 'UPDATE_TECH_STACK',
+          params: {
+            layer: 'frontend',
+            name: 'React Native (Expo SDK 52)',
+            reason: 'Cross-platform native iOS & Android application with offline SQLite caching, camera/photo permissions, and push notification tokens.',
+            alternatives: ['Flutter 3.24', 'SwiftUI (iOS)', 'Kotlin Multiplatform'],
+            mermaidOld: 'Web / Mobile UI\n(React 19 + Vite + Tailwind)',
+            mermaidNew: 'Mobile App Client (iOS & Android)\n(React Native + Expo SDK 52)'
+          },
+          label: '📱 Convert Architecture to Mobile App (React Native)'
         }
       };
     }
