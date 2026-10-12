@@ -335,10 +335,19 @@ export default function App() {
 
       case 'UPDATE_TECH_STACK':
       case 'MODIFY_BLUEPRINT': {
-        const { layer, name, reason, alternatives, mermaidOld, mermaidNew } = action.params || {};
+        const { title, layer, name, reason, alternatives, mermaidOld, mermaidNew } = action.params || {};
+
+        if (title) {
+          setUnderstanding(u => u ? { ...u, projectTitle: title } : u);
+        }
+
         setBlueprint(prev => {
           if (!prev) return prev;
           const updated = { ...prev };
+
+          if (title) {
+            updated.repoName = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          }
 
           // Update techStack specifications
           if (layer && updated.techStack) {
@@ -382,7 +391,12 @@ export default function App() {
           setSavedProjects(projects => {
             const updatedProjects = projects.map(p => {
               if (p.id === activeProjectId || (!activeProjectId && p.title === updated.repoName)) {
-                return { ...p, blueprint: updated };
+                return {
+                  ...p,
+                  title: title || p.title,
+                  understanding: title && p.understanding ? { ...p.understanding, projectTitle: title } : p.understanding,
+                  blueprint: updated
+                };
               }
               return p;
             });

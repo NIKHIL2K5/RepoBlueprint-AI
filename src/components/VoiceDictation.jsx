@@ -98,20 +98,16 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
   };
 
   const checkMicrophonePermission = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) return true;
-    try {
-      // Test mic permission and IMMEDIATELY stop track so SpeechRecognition gets exclusive Windows mic access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      return true;
-    } catch (err) {
-      console.warn('Microphone permission notice:', err.message);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
-        return false;
-      }
-      return true;
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const status = await navigator.permissions.query({ name: 'microphone' });
+        if (status.state === 'denied') {
+          setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
+          return false;
+        }
+      } catch (e) {}
     }
+    return true;
   };
 
   const commitFinalText = useCallback(() => {
@@ -214,12 +210,16 @@ export default function VoiceDictation({ value = '', onChange, onAppend }) {
       };
 
       recognition.onend = () => {
-        // Auto-restart if user has NOT clicked stop (Chrome terminates recognition on short pauses)
+        // Auto-restart with fresh recognition instance if user has NOT clicked stop
         if (shouldKeepListeningRef.current) {
           try {
-            recognition.start();
+            const nextRec = initRecognition();
+            if (nextRec) {
+              recognitionRef.current = nextRec;
+              nextRec.start();
+            }
           } catch (e) {
-            // Already started or restarting
+            console.warn('Speech restart notice:', e);
           }
         } else {
           commitFinalText();

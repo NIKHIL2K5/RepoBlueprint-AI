@@ -12,26 +12,21 @@ export async function sendChatMessage({ config, history = [], userMessage, appCo
     return generateOfflineCopilotResponse(userMessage, appContext);
   }
 
-  // 1. Try Ollama if configured — throw actual errors so user can see them
+  // 1. Try Ollama if configured
   if (config?.provider === 'ollama') {
     try {
       const result = await callOllamaChat(config, systemPrompt, history, userMessage);
       return result;
     } catch (ollamaErr) {
-      console.error('[Copilot Ollama Error]', ollamaErr);
-      // Return a helpful error message rather than silently falling to static fallback
-      const errMsg = ollamaErr?.message || 'Connection failed';
-      const isOffline = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to fetch');
-      if (isOffline) {
-        return {
-          text: `⚠️ **Ollama Connection Issue**: I couldn't reach Ollama at \`${config.ollamaUrl || 'http://localhost:11434'}\`. Please verify Ollama is running (\`ollama serve\`) and the URL is correct in your settings.\n\nIn the meantime, I can still use the Instant Demo engine — just ask me anything!`,
-          action: null
-        };
-      }
-      // Real error from Ollama (model not found, etc.)
+      console.warn('[Copilot Ollama fallback]', ollamaErr);
+      const fallback = generateOfflineCopilotResponse(userMessage, appContext);
+      const isRemote = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+      const note = isRemote
+        ? `\n\n> 💡 *Note: Served via built-in Architect Engine. Cloud-hosted HTTPS (Vercel) cannot reach local \`http://localhost:11434\`. For local Ollama inference, run \`npm run dev\` and use \`http://localhost:5173\`.*`
+        : '';
       return {
-        text: `⚠️ **Ollama Error**: ${errMsg}. Make sure model \`${config.ollamaModel || 'llama3.2:3b'}\` is pulled (\`ollama pull ${config.ollamaModel || 'llama3.2:3b'}\`) and running.`,
-        action: null
+        ...fallback,
+        text: (fallback?.text || '') + note
       };
     }
   }
@@ -351,7 +346,32 @@ function getDefaultActionLabel(action) {
 /* ──────────────── HIGH-INTELLIGENCE CONTEXTUAL FALLBACK ──────────────── */
 function generateOfflineCopilotResponse(query, appContext = {}) {
   const q = (query || '').toLowerCase();
-  const stage = appContext.stage || 'input';
+  // GLOBAL: Project Renaming & Idea Updating across all stages
+  const renameMatch = query.match(/(?:change|rename|set|update)\s+(?:the\s+)?(?:idea\s+name|project\s+name|project\s+title|title|name|idea)\s+(?:to\s+|as\s+|into\s+)(.+)/i);
+  if (renameMatch) {
+    const newName = renameMatch[1].trim().replace(/^["']|["']$/g, '');
+    if (newName) {
+      if (stage === 'input' || stage === 'setup') {
+        return {
+          text: `Updated your idea name to **"${newName}"** on the draft canvas!`,
+          action: {
+            type: 'FILL_IDEA',
+            params: { text: newName },
+            label: `✏️ Update Idea to "${newName}"`
+          }
+        };
+      } else {
+        return {
+          text: `I've renamed your project architecture to **"${newName}"**! The title and live blueprints have been updated.`,
+          action: {
+            type: 'MODIFY_BLUEPRINT',
+            params: { title: newName },
+            label: `✏️ Rename Project to "${newName}"`
+          }
+        };
+      }
+    }
+  }
 
   // 1. STAGE: INPUT
   if (stage === 'input' || stage === 'setup') {

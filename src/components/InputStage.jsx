@@ -33,11 +33,9 @@ export default function InputStage({
     setImageFile(file);
     const fileName = (file.name || '').toLowerCase();
     
-    // Auto-detect document type from filename if user hasn't typed custom constraints
+    // Auto-populate document type if user hasn't typed custom constraints
     if (!ideaText.trim()) {
-      if (fileName.includes('id') || fileName.includes('card') || fileName.includes('student') || fileName.includes('badge') || fileName.includes('kyc') || fileName.includes('license') || fileName.includes('passport') || fileName.includes('aadhaar')) {
-        setIdeaText('Smart ID Card & Identity Verification System. Extract credentials via OCR (Name, ID, Photo, Expiration), design automated verification, face match, encrypted database storage, and identity management APIs.');
-      }
+      setIdeaText('Smart ID Card & Identity Verification System. Extract credentials via OCR (Name, ID, Photo, Expiration), design automated verification, face match, encrypted database storage, and identity management APIs.');
     }
 
     const reader = new FileReader();
