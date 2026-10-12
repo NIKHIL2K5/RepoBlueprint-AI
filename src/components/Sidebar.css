@@ -4,14 +4,16 @@
   width: 260px;
   min-width: 260px;
   height: 100vh;
+  max-height: 100vh;
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  position: sticky;
+  position: relative;
   top: 0;
   left: 0;
   z-index: 40;
+  flex-shrink: 0;
   transition: transform var(--transition), width var(--transition), margin-left var(--transition);
   overflow: hidden;
   user-select: none;

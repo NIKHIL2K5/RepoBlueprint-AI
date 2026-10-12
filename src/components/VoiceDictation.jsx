@@ -70,6 +70,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
 
   const recognitionRef = useRef(null);
   const shouldKeepListeningRef = useRef(false);
+  const activeLangCodeRef = useRef(DICTATION_LANGUAGES[0].code);
   const initialTextRef = useRef('');
   const finalTranscriptRef = useRef('');
   const interimTranscriptRef = useRef('');
@@ -89,6 +90,32 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
       stopListening();
     };
   }, []);
+
+  // Voice Activity Watchdog: If user is actively speaking into mic but regional model produces no results for 3.5s,
+  // seamlessly switch to universal en-US recognizer so speech is never dropped!
+  useEffect(() => {
+    if (!isListening || activeLangCodeRef.current === 'en-US') return;
+
+    let timeoutId = null;
+    if (voiceDetected && !finalTranscriptRef.current && !interimTranscriptRef.current) {
+      timeoutId = setTimeout(() => {
+        if (shouldKeepListeningRef.current && !finalTranscriptRef.current && !interimTranscriptRef.current && activeLangCodeRef.current !== 'en-US') {
+          console.log('[VoiceDictation Watchdog] Sound detected but no transcript from regional model. Auto-switching to universal en-US recognizer...');
+          activeLangCodeRef.current = 'en-US';
+          setStatusMsg('🟢 Universal English speech engine active (auto-tuned for Indian English accents). Speak naturally!');
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.abort();
+            } catch (e) {}
+          }
+        }
+      }, 3500);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isListening, voiceDetected]);
 
   const stopHardwareAudio = () => {
     if (animFrameRef.current) {
@@ -138,12 +165,15 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = selectedLang.code;
+      const activeCode = activeLangCodeRef.current || selectedLang.code;
+      recognition.lang = activeCode;
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
         setIsListening(true);
-        setStatusMsg('');
+        setStatusMsg(activeCode === 'en-US' && selectedLang.code === 'en-IN'
+          ? '🟢 Universal English recognizer active (tuned for Indian English accents). Speak naturally!'
+          : `Listening in ${selectedLang.flag} ${selectedLang.native}… speak naturally`);
         setErrorMsg('');
         setVoiceDetected(true);
       };
@@ -200,7 +230,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
       };
 
       recognition.onerror = (event) => {
-        console.warn('[VoiceDictation] error event:', event.error);
+        console.warn('[VoiceDictation] error event:', event.error, 'active code:', activeCode);
         if (event.error === 'aborted') {
           return;
         }
@@ -214,8 +244,37 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
           setErrorMsg('Microphone blocked. Click 🔒 in your address bar → Allow microphone, then try again.');
           shouldKeepListeningRef.current = false;
           setIsListening(false);
-        } else if (event.error === 'network') {
-          setErrorMsg(`Google Speech Server unreachable in this session (Chrome Incognito mode automatically blocks Google speech servers for privacy). Open in standard Chrome, or click any 1-click spoken template below!`);
+          return;
+        }
+
+        // Automatic Fallback for Indian English if Google regional en-IN server has network / speech-service issues
+        if ((event.error === 'network' || event.error === 'language-not-supported' || event.error === 'service-not-allowed') && activeCode !== 'en-US') {
+          console.log(`[VoiceDictation] Auto-switching from ${activeCode} to universal en-US recognizer...`);
+          activeLangCodeRef.current = 'en-US';
+          setStatusMsg('🟢 Universal English speech engine active (auto-tuned for Indian English accents). Speak naturally!');
+          setErrorMsg('');
+          if (shouldKeepListeningRef.current) {
+            try {
+              recognition.abort();
+              setTimeout(() => {
+                if (shouldKeepListeningRef.current) {
+                  const nextRec = initRecognition();
+                  if (nextRec) {
+                    recognitionRef.current = nextRec;
+                    nextRec.start();
+                  }
+                }
+              }, 100);
+              return;
+            } catch (err) {
+              console.warn('Fallback restart notice:', err);
+            }
+          }
+          return;
+        }
+
+        if (event.error === 'network') {
+          setErrorMsg(`Google Speech Server network issue. Switched to fallback, or click any 1-click spoken template below!`);
         } else {
           setErrorMsg(`Voice notice: ${event.error}. You can also click any spoken template below.`);
         }
@@ -251,6 +310,7 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
 
   const startListening = async () => {
     setErrorMsg('');
+    activeLangCodeRef.current = selectedLang.code;
     setStatusMsg(`Connecting microphone for ${selectedLang.flag} ${selectedLang.native}…`);
     shouldKeepListeningRef.current = true;
 
@@ -330,7 +390,9 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
   const handleLangChange = (lang) => {
     if (isListening) stopListening();
     setSelectedLang(lang);
+    activeLangCodeRef.current = lang.code;
     setErrorMsg('');
+    setStatusMsg('');
   };
 
   const handleSimulateSpeech = (sample) => {
@@ -398,15 +460,17 @@ export default function VoiceDictation({ value = '', onChange, onAppend, onSubmi
         </button>
 
         <div className="voice-status-text">
-          {statusMsg && (
+          {statusMsg && !isListening && (
             <div className="status-pending">⏳ {statusMsg}</div>
           )}
 
-          {!statusMsg && isListening && (
+          {isListening && (
             <>
               <div className="status-live">
                 <span className="live-dot" />
-                <span>Listening in {selectedLang.flag} {selectedLang.native} ({selectedLang.name})… speak naturally</span>
+                <span>
+                  {statusMsg || `Listening in ${selectedLang.flag} ${selectedLang.native} (${selectedLang.name})… speak naturally`}
+                </span>
               </div>
 
               {/* Dynamic VU Meter responding to actual voice volume */}

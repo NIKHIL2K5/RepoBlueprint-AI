@@ -101,6 +101,7 @@
 }
 
 html {
+  height: 100%;
   scroll-behavior: smooth;
   font-size: 16px;
   background-color: var(--bg);
@@ -108,14 +109,20 @@ html {
 }
 
 body {
+  height: 100%;
   font-family: var(--font-sans);
   background-color: var(--bg);
   color: var(--text-primary);
-  min-height: 100vh;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color var(--transition), color var(--transition);
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 /* ── Typography Scale & Weights ── */

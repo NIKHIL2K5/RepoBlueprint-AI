@@ -1,6 +1,8 @@
 /* ── Editorial App Layout ── */
 .app {
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background-color: var(--bg);
   transition: background-color var(--transition);
 }
@@ -10,6 +12,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 /* Loading: full page */
@@ -17,18 +21,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 /* Main layout: sidebar + content */
 .app--layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
 }
 
 /* Sidebar transitions */
 .app--layout .editorial-sidebar {
   flex-shrink: 0;
+  height: 100vh;
+  max-height: 100vh;
+  position: relative;
+  overflow: hidden;
   transition: width var(--transition), transform var(--transition), margin-left var(--transition);
 }
 .app--layout.sidebar-is-closed .editorial-sidebar {
@@ -36,15 +53,18 @@
   transform: translateX(-100%);
 }
 
-/* Content Area */
+/* Content Area - ONLY this area scrolls */
 .app-content {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
   background-color: var(--bg);
+  position: relative;
 }
 
 /* Top Navbar */
