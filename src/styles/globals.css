@@ -1,0 +1,535 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   RepoBlueprint AI — Editorial Design System
+   Inspired by Claude.ai: Warm, calm, editorial, minimal, text-first
+───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Color Tokens — Light Mode (Warm Ivory default) */
+  --bg:             #FAF9F5;
+  --bg-sidebar:     #F5F4ED;
+  --surface:        #FFFFFF;
+  --surface-hover:  #F0EEE6;
+  --border:         #E8E6DC;
+  --text-primary:   #141413;
+  --text-secondary: #5E5D59;
+  --text-muted:     #87867F;
+  --accent:         #D97757;
+  --accent-button:  #C96442;
+  --accent-hover:   #B85736;
+  --accent-soft:    #F5E0D6;
+  --user-bubble:    #F0EEE6;
+
+  /* Supporting Accent Hues */
+  --olive:          #788C5D;
+  --sky:            #6A9BCB;
+  --fig:            #C46686;
+  --cactus:         #BCD1CA;
+  --heather:        #CBCADB;
+  --oat:            #E3DACC;
+
+  /* Typography */
+  --font-serif:     'Newsreader', 'Source Serif 4', Georgia, serif;
+  --font-sans:      'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:      'JetBrains Mono', ui-monospace, Menlo, Monaco, monospace;
+
+  /* Shape & Radii */
+  --radius-btn:     9px;
+  --radius-card:    14px;
+  --radius-input:   22px;
+  --radius-pill:    999px;
+  --radius-sm:      6px;
+  --radius-md:      10px;
+  --radius-lg:      16px;
+
+  /* Shadows & Depth (Flat, soft, non-neon) */
+  --shadow-subtle:  0 1px 3px rgba(20, 20, 19, 0.04);
+  --shadow-soft:    0 2px 12px rgba(20, 20, 19, 0.06);
+  --shadow-float:   0 8px 24px rgba(20, 20, 19, 0.08);
+  --shadow-input-focus: 0 4px 16px rgba(217, 119, 87, 0.12);
+
+  /* Focus Ring */
+  --focus-ring:     0 0 0 3px rgba(217, 119, 87, 0.25);
+
+  /* Transitions */
+  --transition:     150ms ease;
+
+  /* Backward Compatibility Aliases for components */
+  --bg-deep:        var(--bg);
+  --bg-surface:     var(--bg-sidebar);
+  --bg-card:        var(--surface);
+  --bg-card-2:      var(--surface-hover);
+  --border-bright:  var(--border);
+  --border-glow:    var(--border);
+  --cyan:           var(--accent);
+  --cyan-dim:       var(--accent-soft);
+  --cyan-glow:      none;
+  --violet:         var(--accent-button);
+  --violet-dim:     var(--accent-soft);
+  --green:          var(--olive);
+  --orange:         var(--accent);
+}
+
+[data-theme="dark"] {
+  /* Color Tokens — Dark Mode (Warm Charcoal & Deep Espresso) */
+  --bg:             #262624;
+  --bg-sidebar:     #1F1E1D;
+  --surface:        #30302E;
+  --surface-hover:  #3A3936;
+  --border:         #3E3D3A;
+  --text-primary:   #F5F4ED;
+  --text-secondary: #C2C0B6;
+  --text-muted:     #8F8D85;
+  --accent:         #D97757;
+  --accent-button:  #D97757;
+  --accent-hover:   #E58A6C;
+  --accent-soft:    #3D2B24;
+  --user-bubble:    #3A3936;
+
+  /* Shadows for dark mode */
+  --shadow-subtle:  0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-soft:    0 2px 12px rgba(0, 0, 0, 0.25);
+  --shadow-float:   0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-input-focus: 0 4px 16px rgba(217, 119, 87, 0.2);
+  --focus-ring:     0 0 0 3px rgba(217, 119, 87, 0.35);
+}
+
+/* ── Reset & Baseline ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+/* ── Typography Scale & Weights ── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 450;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.35rem; }
+h4 { font-size: 1.1rem; }
+
+p {
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+/* ── Thin Subtle Scrollbars ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Selection ── */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+  line-height: 1.3;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background-color: var(--accent-button);
+  color: #FFFFFF;
+  border-color: transparent;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border);
+  box-shadow: var(--shadow-subtle);
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.btn-icon {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-btn);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-icon:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* Round Send Button in Claude style */
+.btn-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--accent-button);
+  color: #FFFFFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.btn-send:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  transform: scale(1.05);
+}
+.btn-send:disabled {
+  background-color: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Cards & Surfaces ── */
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.card:hover {
+  border-color: var(--border);
+}
+
+/* ── Badges & Status Pills ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.badge-accent {
+  background: var(--accent-soft);
+  color: var(--accent-button);
+  border-color: transparent;
+}
+
+.badge-cyan, .badge-violet {
+  background: var(--accent-soft);
+  color: var(--accent-button);
+  border-color: transparent;
+}
+
+.badge-green {
+  background: rgba(120, 140, 93, 0.12);
+  color: var(--olive);
+  border-color: rgba(120, 140, 93, 0.2);
+}
+
+.badge-orange {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+/* ── Editorial Input Card (Claude Style) ── */
+.chat-input-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 18px;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.chat-input-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-input-focus), var(--focus-ring);
+}
+
+.chat-input-textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  min-height: 56px;
+  max-height: 240px;
+}
+.chat-input-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.chat-input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+
+/* ── Messages & Bubbles ── */
+.msg-user {
+  background-color: var(--user-bubble);
+  color: var(--text-primary);
+  padding: 12px 18px;
+  border-radius: var(--radius-card);
+  max-width: 82%;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-left: auto;
+  border: 1px solid var(--border);
+}
+
+.msg-assistant {
+  background-color: transparent;
+  color: var(--text-primary);
+  padding: 6px 0;
+  max-width: 100%;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.msg-assistant-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.msg-assistant:hover .msg-assistant-actions,
+.msg-assistant:focus-within .msg-assistant-actions {
+  opacity: 1;
+}
+
+/* Subtle typing dot */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: typingPulse 1.2s infinite ease-in-out;
+}
+@keyframes typingPulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Fade In Animation */
+.animate-fade-in {
+  animation: fadeIn 200ms ease forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Code Block ── */
+.code-block-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin: 12px 0;
+  box-shadow: var(--shadow-subtle);
+}
+[data-theme="dark"] .code-block-wrapper {
+  background: #1C1B1A;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--surface-hover);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.code-block-content {
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+/* ── Dropdowns & Popovers ── */
+.dropdown-menu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  padding: 6px;
+  min-width: 180px;
+  z-index: 100;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  font-size: 13.5px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.dropdown-item:hover {
+  background: var(--surface-hover);
+}
+
+/* ── Form Controls & Inputs ── */
+input[type="text"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  outline: none;
+  transition: all var(--transition);
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Disclaimer text ── */
+.disclaimer-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+}

@@ -1,0 +1,217 @@
+/* ── Editorial App Layout ── */
+.app {
+  min-height: 100vh;
+  background-color: var(--bg);
+  transition: background-color var(--transition);
+}
+
+/* Setup: full page, no sidebar */
+.app--setup {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* Loading: full page */
+.app--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Main layout: sidebar + content */
+.app--layout {
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar transitions */
+.app--layout .editorial-sidebar {
+  flex-shrink: 0;
+  transition: width var(--transition), transform var(--transition), margin-left var(--transition);
+}
+.app--layout.sidebar-is-closed .editorial-sidebar {
+  margin-left: -260px;
+  transform: translateX(-100%);
+}
+
+/* Content Area */
+.app-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-y: auto;
+  background-color: var(--bg);
+}
+
+/* Top Navbar */
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: none;
+}
+
+.topbar-toggle-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.topbar-toggle-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.topbar-brand {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.topbar-sep {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.topbar-stage {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-engine-badge {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Main Content */
+.app-main {
+  flex: 1;
+}
+
+/* Footer */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  background-color: var(--bg);
+}
+.footer-sep { color: var(--border); }
+
+/* Error Screen */
+.error-screen {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+.error-box {
+  max-width: 480px;
+  width: 100%;
+  padding: 40px;
+  text-align: center;
+  background: var(--surface) !important;
+  border-color: rgba(196, 102, 134, 0.3) !important;
+}
+.error-icon-wrap {
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+.error-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 450;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.error-message {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+.error-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeInUp 250ms ease forwards;
+}
+
+/* ── Legacy compatibility aliases for existing screens ── */
+.nav-accent { color: var(--accent); }
+.nav-ai {
+  font-size: 11px;
+  background: var(--accent-soft);
+  color: var(--accent-button);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+.nav-logo-text {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.nav-settings-btn {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .app--layout {
+    flex-direction: column;
+  }
+  .app--layout .editorial-sidebar {
+    position: fixed;
+    height: 100vh;
+    z-index: 50;
+  }
+  .topbar-breadcrumb .topbar-brand { font-size: 14px; }
+  .topbar-stage { display: none; }
+}

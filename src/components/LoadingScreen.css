@@ -1,0 +1,98 @@
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  position: relative;
+  z-index: 1;
+}
+.loading-content {
+  text-align: center;
+  max-width: 480px;
+}
+
+/* ── Pulsing rings ── */
+.loading-logo {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.loading-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+.loading-ring--outer {
+  width: 120px; height: 120px;
+  border-color: rgba(0,240,255,0.15);
+  animation-delay: 0s;
+}
+.loading-ring--middle {
+  width: 88px; height: 88px;
+  border-color: rgba(121,40,202,0.3);
+  animation-delay: 0.3s;
+}
+.loading-ring--inner {
+  width: 56px; height: 56px;
+  border-color: rgba(0,240,255,0.5);
+  animation-delay: 0.6s;
+}
+.loading-icon {
+  font-size: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.loading-title { font-size: 22px; margin-bottom: 8px; }
+.loading-subtitle { font-size: 14px; color: var(--text-muted); margin-bottom: 36px; }
+
+/* ── Stages ── */
+.loading-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+.loading-stage {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+.loading-stage.active { color: var(--text-primary); }
+.loading-stage.done { color: var(--green); }
+.stage-indicator {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── Progress ── */
+.loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.loading-bar .progress-bar { flex: 1; height: 4px; }
+.loading-pct { font-size: 13px; font-weight: 700; color: var(--cyan); min-width: 36px; }
+
+.loading-tip {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}

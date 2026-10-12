@@ -1,0 +1,717 @@
+import { useState, useEffect, useRef } from 'react';
+import './CopilotDrawer.css';
+import { sendChatMessage } from '../services/copilot';
+
+export const SUPPORTED_LANGUAGES = [
+  { code: 'en-US', name: 'English', native: 'English', flag: '🇺🇸' },
+  { code: 'hi-IN', name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'te-IN', name: 'Telugu', native: 'తెలుగు', flag: '🇮🇳' },
+  { code: 'es-ES', name: 'Spanish', native: 'Español', flag: '🇪🇸' },
+  { code: 'fr-FR', name: 'French', native: 'Français', flag: '🇫🇷' },
+  { code: 'de-DE', name: 'German', native: 'Deutsch', flag: '🇩🇪' },
+  { code: 'ja-JP', name: 'Japanese', native: '日本語', flag: '🇯🇵' },
+  { code: 'zh-CN', name: 'Chinese', native: '中文', flag: '🇨🇳' },
+];
+
+const STAGE_QUICK_ACTIONS = {
+  setup: [
+    { text: '🦙 How does local Ollama work?', query: 'How does local Ollama work and why is it private?' },
+    { text: '⚡ Switch to Instant Demo', query: 'Switch to instant demo mode' },
+  ],
+  input: [
+    { text: '✨ Enhance my project idea', query: 'Enhance my project idea with enterprise scalability and modular architecture' },
+    { text: '🎙️ Switch to Voice Dictation', query: 'Switch to voice dictation so I can speak my idea' },
+    { text: '🎨 Open Whiteboard Canvas', query: 'Open the napkin whiteboard canvas so I can draw' },
+    { text: '⚡ Load AI Habit Coach', query: 'Load the AI Habit Coach preset template' },
+    { text: '🚀 Proceed to Alignment', query: 'Submit my idea and proceed to technical co-founder alignment' },
+  ],
+  alignment: [
+    { text: '💡 Recommend best database', query: 'Which database do you recommend for my app and why?' },
+    { text: '🗄️ Select PostgreSQL', query: 'Select PostgreSQL for database in question 1' },
+    { text: '📝 Add Docker & Tailwind constraints', query: 'Add Docker Compose and Tailwind CSS to additional constraints' },
+    { text: '🚀 Generate Master Blueprint', query: 'Everything looks good, generate the master architecture blueprint' },
+  ],
+  dashboard: [
+    { text: '📦 Download Starter Repo .zip', query: 'Download the starter repository zip bundle now' },
+    { text: '⚙️ Explain Tech Stack choices', query: 'Explain the chosen tech stack and trade-offs' },
+    { text: '💰 View Cost Calculator', query: 'Switch to the Cost Calculator tab' },
+    { text: '📈 Scale Cost to 50k DAU', query: 'Scale cost calculator estimate to 50000 DAU' },
+    { text: '🔎 Open GitHub Market Intel', query: 'Open GitHub market intelligence tab to see similar repos' },
+  ],
+};
+
+export default function CopilotDrawer({
+  appContext = {},
+  onExecuteAction,
+  config,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+  const [selectedLang, setSelectedLang] = useState(SUPPORTED_LANGUAGES[0]); // default en-US
+  const [speakingMsgId, setSpeakingMsgId] = useState(null);
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [autoApply, setAutoApply] = useState(true);
+  const [ttsEnabled, setTtsEnabled] = useState(true); // default audio ON!
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const [messages, setMessages] = useState(() => [
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: `👋 **Hello! I'm your AI Technical Co-Founder & Architecture Copilot.**\n\nI can speak and guide you in **multiple languages** (English, हिन्दी, తెలుగు, Español, Français, Deutsch, 日本語, 中文), explain trade-offs, and **take real actions on this page** (editing your ideas, selecting choices, switching tabs, or downloading your starter repo).`,
+      action: null,
+      actionApplied: false,
+    }
+  ]);
+  const [isThinking, setIsThinking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const audioPlayerRef = useRef(null);
+
+  // Stop any currently playing audio (SpeechSynthesis or HTML5 Audio proxy)
+  const stopAudio = () => {
+    if (audioPlayerRef.current) {
+      try {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
+      } catch (e) {}
+      audioPlayerRef.current = null;
+    }
+    if (window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+    setSpeakingMsgId(null);
+  };
+
+  // Load voices for speech synthesis
+  useEffect(() => {
+    const loadVoices = () => {
+      if (window.speechSynthesis) {
+        const v = window.speechSynthesis.getVoices();
+        setAvailableVoices(v);
+      }
+    };
+
+    loadVoices();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    return () => {
+      stopAudio();
+    };
+  }, []);
+
+  // Auto-scroll on new message
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen, isMinimized]);
+
+  // Voice recognition setup for Chatbot mic (tuned to selected language!)
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = selectedLang.code; // dynamic language for mic!
+
+      recognition.onresult = (event) => {
+        let currentFinal = '';
+        let currentInterim = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          const text = event.results[i][0]?.transcript || '';
+          if (event.results[i].isFinal) currentFinal += text + ' ';
+          else currentInterim += text;
+        }
+        const combined = (currentFinal + currentInterim).trim();
+        if (combined) {
+          setInputVal(combined);
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error !== 'aborted' && e.error !== 'no-speech') {
+          console.warn('Copilot mic error:', e.error);
+        }
+        setIsListening(false);
+      };
+      recognition.onend = () => setIsListening(false);
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      try { recognitionRef.current?.stop(); } catch (e) {}
+    };
+  }, [selectedLang.code]);
+
+  const toggleVoice = async () => {
+    if (isListening) {
+      try { recognitionRef.current?.stop(); } catch (e) {}
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        // Request permission test and IMMEDIATELY release device track so SpeechRecognition gets exclusive access
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.lang = selectedLang.code;
+        recognitionRef.current.start();
+        setIsListening(true);
+      }
+    } catch (e) {
+      console.warn('Failed to start copilot voice:', e);
+      setIsListening(false);
+    }
+  };
+
+  // Helper to determine if a true native OS voice is installed for this language
+  const hasNativeVoice = (langCode) => {
+    if (!availableVoices || availableVoices.length === 0) return false;
+    const prefix = langCode.split('-')[0].toLowerCase();
+    // Special case: Windows never has high-quality Telugu TTS installed by default
+    if (prefix === 'te') return false;
+    return availableVoices.some(v => v.lang.toLowerCase().startsWith(prefix));
+  };
+
+  const getBestVoice = (langCode) => {
+    if (!availableVoices || availableVoices.length === 0) return null;
+    const exact = availableVoices.find(v => v.lang.toLowerCase() === langCode.toLowerCase());
+    if (exact) return exact;
+
+    const prefix = langCode.split('-')[0].toLowerCase();
+    const prefixMatch = availableVoices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    if (prefixMatch) return prefixMatch;
+
+    return null;
+  };
+
+  // High-fidelity chunked audio player via Google Translate TTS proxy
+  const playAudioViaProxy = (cleanText, langCode, msgId) => {
+    stopAudio();
+
+    const langShort = langCode.split('-')[0].toLowerCase();
+    // Split on sentence punctuation (. ? ! \n)
+    const sentences = cleanText.split(/([.?!;\n]+)/).filter(Boolean);
+    const chunks = [];
+    let currentChunk = '';
+
+    for (const part of sentences) {
+      if ((currentChunk + part).length > 140) {
+        if (currentChunk.trim()) chunks.push(currentChunk.trim());
+        currentChunk = part;
+      } else {
+        currentChunk += part;
+      }
+    }
+    if (currentChunk.trim()) chunks.push(currentChunk.trim());
+    if (chunks.length === 0) chunks.push(cleanText.slice(0, 140));
+
+    let currentIndex = 0;
+    setSpeakingMsgId(msgId);
+
+    const playNext = () => {
+      if (currentIndex >= chunks.length) {
+        setSpeakingMsgId(null);
+        audioPlayerRef.current = null;
+        return;
+      }
+
+      const chunk = chunks[currentIndex++];
+      const url = `/tts/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langShort)}&client=tw-ob&q=${encodeURIComponent(chunk)}`;
+      const audio = new Audio(url);
+      audioPlayerRef.current = audio;
+
+      audio.onended = () => {
+        playNext();
+      };
+
+      audio.onerror = (e) => {
+        console.warn('TTS proxy playback error on chunk, moving to next:', e);
+        playNext();
+      };
+
+      audio.play().catch(playErr => {
+        console.warn('Audio play autoplay error:', playErr);
+        setSpeakingMsgId(null);
+        audioPlayerRef.current = null;
+      });
+    };
+
+    playNext();
+  };
+
+  // Audio Text-to-Speech Output (Hybrid Native + Proxy Engine)
+  const speakText = (text, langCode = selectedLang.code, msgId = null) => {
+    if (speakingMsgId === msgId) {
+      stopAudio();
+      return;
+    }
+
+    // Strip markdown formatting, code blocks, and action tags for clean voice output
+    const clean = text
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/`.*?`/g, '')
+      .replace(/[*#_~>]/g, '')
+      .replace(/<<<[\s\S]*?>>>/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .trim();
+
+    if (!clean) return;
+
+    // Check if we need proxy (Telugu, Hindi without OS pack, etc.)
+    const canUseNative = hasNativeVoice(langCode);
+
+    if (!canUseNative) {
+      // Use proxy endpoint for Telugu and any language missing a native OS voice!
+      playAudioViaProxy(clean, langCode, msgId);
+      return;
+    }
+
+    // Use native Web Speech Synthesis if an authentic native voice is present
+    try {
+      stopAudio();
+
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = langCode;
+
+      const matchedVoice = getBestVoice(langCode);
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
+      }
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => {
+        setSpeakingMsgId(msgId);
+      };
+
+      utterance.onend = () => {
+        setSpeakingMsgId(null);
+      };
+
+      utterance.onerror = () => {
+        setSpeakingMsgId(null);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('Speech synthesis error, falling back to proxy:', err);
+      playAudioViaProxy(clean, langCode, msgId);
+    }
+  };
+
+  const handleSend = async (customQuery = null) => {
+    const textToSend = customQuery || inputVal.trim();
+    if (!textToSend || isThinking) return;
+
+    if (!customQuery) setInputVal('');
+
+    const userMsg = {
+      id: 'usr-' + Date.now(),
+      role: 'user',
+      content: textToSend,
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setIsThinking(true);
+
+    try {
+      const res = await sendChatMessage({
+        config,
+        history: [...messages, userMsg],
+        userMessage: textToSend,
+        appContext: {
+          ...appContext,
+          languageCode: selectedLang.code,
+          languageName: selectedLang.name,
+        },
+      });
+
+      let applied = false;
+      if (res.action && onExecuteAction && autoApply) {
+        try {
+          onExecuteAction(res.action);
+          applied = true;
+        } catch (actErr) {
+          console.warn('Auto action error:', actErr);
+        }
+      }
+
+      const assistantMsg = {
+        id: 'ast-' + Date.now(),
+        role: 'assistant',
+        content: res.text,
+        action: res.action,
+        actionApplied: applied,
+      };
+
+      setMessages(prev => [...prev, assistantMsg]);
+
+      // Automatic Audio Speech Out in chosen language if TTS enabled!
+      if (ttsEnabled) {
+        speakText(res.text, selectedLang.code, assistantMsg.id);
+      }
+
+      if (!isOpen) {
+        setUnreadCount(c => c + 1);
+      }
+    } catch (err) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: 'err-' + Date.now(),
+          role: 'assistant',
+          content: `⚠️ Error communicating with AI: ${err.message || 'Please try again.'}`,
+        }
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const handleApplyAction = (msgId, action) => {
+    if (!action || !onExecuteAction) return;
+    try {
+      onExecuteAction(action);
+      setMessages(prev =>
+        prev.map(m => (m.id === msgId ? { ...m, actionApplied: true } : m))
+      );
+    } catch (e) {
+      console.error('Failed to apply action:', e);
+    }
+  };
+
+  const currentStage = appContext.stage || 'input';
+  const quickActions = STAGE_QUICK_ACTIONS[currentStage] || STAGE_QUICK_ACTIONS.input;
+
+  return (
+    <aside className="copilot-widget" aria-label="AI Technical Co-Founder Copilot">
+      {/* Floating Trigger Button */}
+      {!isOpen && (
+        <button
+          type="button"
+          id="copilot-floating-trigger"
+          className="copilot-floating-btn animate-float"
+          onClick={() => {
+            setIsOpen(true);
+            setIsMinimized(false);
+            setUnreadCount(0);
+          }}
+          title="Open AI Technical Co-Founder Copilot"
+        >
+          <span className="copilot-btn-icon">🤖</span>
+          <span className="copilot-btn-text">Co-Founder Copilot</span>
+          <span className="copilot-lang-pill">{selectedLang.flag}</span>
+          <span className="copilot-pulse-dot" />
+          {unreadCount > 0 && <span className="copilot-badge">{unreadCount}</span>}
+        </button>
+      )}
+
+      {/* Main Drawer Window */}
+      {isOpen && (
+        <div className={`copilot-panel card ${isMinimized ? 'copilot-panel--minimized' : ''} animate-slide-up`}>
+          {/* Header */}
+          <div className="copilot-header">
+            <div className="copilot-header-brand">
+              <span className="copilot-avatar">🤖</span>
+              <div>
+                <div className="copilot-title">
+                  Architect Co-Founder
+                  <span className="live-status-dot" title="Active Copilot" />
+                </div>
+                <div className="copilot-meta">
+                  <span className="copilot-stage-tag">📍 {getStageLabel(currentStage)}</span>
+                  <span className="copilot-engine-tag">
+                    {config?.provider === 'ollama' ? `🦙 ${config?.ollamaModel || 'Ollama'}` : config?.provider === 'gemini' ? '✨ Gemini' : '⚡ Instant Sandbox'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="copilot-header-actions">
+              {/* Language Selector Dropdown */}
+              <div className="copilot-lang-picker" title="Select Co-Founder Language & Audio Voice">
+                <span className="lang-globe-icon">🌐</span>
+                <select
+                  className="copilot-lang-select"
+                  value={selectedLang.code}
+                  onChange={(e) => {
+                    const found = SUPPORTED_LANGUAGES.find(l => l.code === e.target.value);
+                    if (found) setSelectedLang(found);
+                  }}
+                  aria-label="Choose Language"
+                >
+                  {SUPPORTED_LANGUAGES.map(lang => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.flag} {lang.native} ({lang.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Auto Action Toggle */}
+              <button
+                type="button"
+                className={`btn-icon ${autoApply ? 'active' : ''}`}
+                onClick={() => setAutoApply(!autoApply)}
+                title={autoApply ? 'Auto-Execute Actions: ON' : 'Auto-Execute Actions: OFF'}
+              >
+                ⚡
+              </button>
+
+              {/* Text-To-Speech Audio Auto-Play Toggle */}
+              <button
+                type="button"
+                className={`btn-icon ${ttsEnabled ? 'active' : ''}`}
+                onClick={() => {
+                  const nextState = !ttsEnabled;
+                  setTtsEnabled(nextState);
+                  if (!nextState) {
+                    stopAudio();
+                  }
+                }}
+                title={ttsEnabled ? `Audio Speech Out: ON (${selectedLang.native})` : 'Audio Speech Out: OFF'}
+              >
+                {ttsEnabled ? '🔊' : '🔇'}
+              </button>
+
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setIsMinimized(!isMinimized)}
+                title={isMinimized ? 'Expand Drawer' : 'Minimize Drawer'}
+              >
+                {isMinimized ? '🔼' : '🔽'}
+              </button>
+
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => {
+                  stopAudio();
+                  setIsOpen(false);
+                }}
+                title="Close Copilot"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {!isMinimized && (
+            <>
+              {/* Dynamic Quick Prompt Chips */}
+              <div className="copilot-quick-actions">
+                <div className="quick-actions-scroll">
+                  {quickActions.map((qa, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="quick-chip"
+                      onClick={() => handleSend(qa.query)}
+                      disabled={isThinking}
+                    >
+                      {qa.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chat Messages Body */}
+              <div className="copilot-messages-container">
+                {messages.map(msg => (
+                  <div key={msg.id} className={`copilot-bubble copilot-bubble--${msg.role}`}>
+                    <div className="bubble-content">
+                      {formatMessage(msg.content)}
+                    </div>
+
+                    {/* Audio Speech Out Button on Assistant Messages */}
+                    {msg.role === 'assistant' && (
+                      <div className="bubble-speech-bar">
+                        <button
+                          type="button"
+                          className={`bubble-audio-btn ${speakingMsgId === msg.id ? 'is-speaking' : ''}`}
+                          onClick={() => speakText(msg.content, selectedLang.code, msg.id)}
+                          title={speakingMsgId === msg.id ? 'Stop Audio' : `Listen Audio in ${selectedLang.native}`}
+                        >
+                          {speakingMsgId === msg.id ? (
+                            <>
+                              <span className="mini-sound-wave">
+                                <span className="mini-wave" />
+                                <span className="mini-wave" />
+                                <span className="mini-wave" />
+                              </span>
+                              <span>⏹️ Stop Audio</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>🔊 Listen ({selectedLang.flag} {selectedLang.native})</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Interactive Action Card */}
+                    {msg.action && (
+                      <div className={`action-card ${msg.actionApplied ? 'action-card--applied' : ''}`}>
+                        <div className="action-card-header">
+                          <span className="action-card-icon">⚡</span>
+                          <span className="action-card-title">Recommended Page Action</span>
+                          {msg.actionApplied && <span className="action-status-badge">✓ Executed</span>}
+                        </div>
+                        <div className="action-card-desc">
+                          {getActionDescription(msg.action)}
+                        </div>
+                        <button
+                          type="button"
+                          className={`btn action-exec-btn ${msg.actionApplied ? 'btn-ghost' : 'btn-primary'}`}
+                          onClick={() => handleApplyAction(msg.id, msg.action)}
+                          disabled={msg.actionApplied}
+                        >
+                          {msg.actionApplied ? '✓ Action Applied to Screen' : `👉 ${msg.action.label || 'Apply Action to Page'}`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {isThinking && (
+                  <div className="copilot-bubble copilot-bubble--assistant thinking-bubble">
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                    <span className="thinking-label">
+                      Co-Founder responding in {selectedLang.native}...
+                    </span>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Footer */}
+              <div className="copilot-input-area">
+                <div className="copilot-input-wrapper">
+                  <input
+                    type="text"
+                    className="copilot-input"
+                    placeholder={`Ask in ${selectedLang.native} (${selectedLang.name}) or enter command...`}
+                    value={inputVal}
+                    onChange={(e) => setInputVal(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSend();
+                    }}
+                    disabled={isThinking}
+                  />
+
+                  {/* Built-in Voice Dictation Button (Configured to selected language) */}
+                  <button
+                    type="button"
+                    className={`copilot-mic-btn ${isListening ? 'listening' : ''}`}
+                    onClick={toggleVoice}
+                    title={isListening ? 'Stop Listening' : `Speak in ${selectedLang.native} (${selectedLang.code})`}
+                  >
+                    {isListening ? '⏹️' : '🎙️'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="copilot-send-btn"
+                    onClick={() => handleSend()}
+                    disabled={isThinking || !inputVal.trim()}
+                    title="Send message"
+                  >
+                    ➤
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function getStageLabel(stage) {
+  const labels = {
+    setup: 'Engine Setup',
+    input: 'Napkin / Voice Input',
+    loading_phase1: 'Analyzing Idea...',
+    alignment: 'Technical Alignment',
+    loading_phase2: 'Synthesizing Blueprint...',
+    dashboard: 'Master Blueprint',
+    error: 'Troubleshooting',
+  };
+  return labels[stage] || 'Active';
+}
+
+function getActionDescription(action) {
+  if (!action) return '';
+  switch (action.type) {
+    case 'FILL_IDEA':
+      return 'Fills your project idea text with enhanced architecture details.';
+    case 'SWITCH_INPUT_TAB':
+      return `Switches the input screen to the "${action.params?.tab}" tab.`;
+    case 'LOAD_SAMPLE':
+      return 'Loads an instant pre-engineered hackathon sample project.';
+    case 'SUBMIT_IDEA':
+      return 'Submits the project idea to begin the Technical Co-Founder Alignment interview.';
+    case 'SELECT_ALIGNMENT_ANSWER':
+      return `Selects "${action.params?.option}" for clarifying question #${(action.params?.questionIndex ?? 0) + 1}.`;
+    case 'SET_ALIGNMENT_NOTES':
+      return 'Adds custom technical constraints to the blueprint generation parameters.';
+    case 'CONFIRM_ALIGNMENT':
+      return 'Generates the comprehensive Master Architecture Blueprint.';
+    case 'SWITCH_DASHBOARD_TAB':
+      return `Switches dashboard tab to "${action.params?.tab}".`;
+    case 'SET_DAU':
+      return `Sets cost calculator scale to ${(action.params?.dau || 0).toLocaleString()} Daily Active Users.`;
+    case 'DOWNLOAD_REPO':
+      return 'Packages and downloads the starter boilerplate repository as a .zip file.';
+    case 'SWITCH_TO_DEMO':
+      return 'Switches immediately to the Instant Sandbox Demo mode.';
+    default:
+      return 'Executes an automated architectural enhancement on this screen.';
+  }
+}
+
+function formatMessage(content) {
+  if (!content) return null;
+  const paragraphs = content.split('\n\n');
+  return paragraphs.map((p, idx) => {
+    const lines = p.split('\n');
+    return (
+      <p key={idx} className="bubble-paragraph">
+        {lines.map((line, lIdx) => {
+          const parts = line.split(/(\*\*.*?\*\*)/g);
+          return (
+            <span key={lIdx}>
+              {parts.map((part, pIdx) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  return <strong key={pIdx}>{part.slice(2, -2)}</strong>;
+                }
+                return part;
+              })}
+              {lIdx < lines.length - 1 && <br />}
+            </span>
+          );
+        })}
+      </p>
+    );
+  });
+}
