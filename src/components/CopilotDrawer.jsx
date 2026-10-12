@@ -114,64 +114,56 @@ export default function CopilotDrawer({
     }
   }, [messages, isOpen, isMinimized]);
 
-  // Voice recognition setup for Chatbot mic (tuned to selected language!)
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = selectedLang.code; // dynamic language for mic!
-
-      recognition.onresult = (event) => {
-        let currentFinal = '';
-        let currentInterim = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          const text = event.results[i][0]?.transcript || '';
-          if (event.results[i].isFinal) currentFinal += text + ' ';
-          else currentInterim += text;
-        }
-        const combined = (currentFinal + currentInterim).trim();
-        if (combined) {
-          setInputVal(combined);
-        }
-      };
-
-      recognition.onerror = (e) => {
-        if (e.error !== 'aborted' && e.error !== 'no-speech') {
-          console.warn('Copilot mic error:', e.error);
-        }
-        setIsListening(false);
-      };
-      recognition.onend = () => setIsListening(false);
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      try { recognitionRef.current?.stop(); } catch (e) {}
-    };
-  }, [selectedLang.code]);
-
-  const toggleVoice = async () => {
+  // Voice recognition setup for Chatbot mic
+  const toggleVoice = () => {
     if (isListening) {
       try { recognitionRef.current?.stop(); } catch (e) {}
       setIsListening(false);
       return;
     }
 
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
+      return;
+    }
+
     try {
-      if (navigator.mediaDevices?.getUserMedia) {
-        // Request permission test and IMMEDIATELY release device track so SpeechRecognition gets exclusive access
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-        }
-      }
       if (recognitionRef.current) {
-        recognitionRef.current.lang = selectedLang.code;
-        recognitionRef.current.start();
-        setIsListening(true);
+        try { recognitionRef.current.abort(); } catch (e) {}
       }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = selectedLang.code;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          transcript += event.results[i][0]?.transcript || '';
+        }
+        if (transcript.trim()) {
+          setInputVal(transcript.trim());
+        }
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('Copilot mic error:', e.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
     } catch (e) {
       console.warn('Failed to start copilot voice:', e);
       setIsListening(false);
