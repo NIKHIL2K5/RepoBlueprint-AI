@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import './WhiteboardCanvas.css';
+import { uploadToCloudinary } from '../services/cloudinary';
+import { addCloudinaryAsset } from '../services/storageService';
 
 const PALETTE = [
   { color: '#00c8ff', label: 'Cyan' },
@@ -18,7 +20,7 @@ const QUICK_BOX_PRESETS = [
   { title: 'Auth / Security', sub: '(OAuth2 + JWT)', color: '#8b5cf6' },
 ];
 
-export default function WhiteboardCanvas({ onExportImage }) {
+export default function WhiteboardCanvas({ onExportImage, currentUser }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [tool, setTool] = useState('pen'); // 'pen' | 'box' | 'text' | 'arrow' | 'eraser'
@@ -26,6 +28,8 @@ export default function WhiteboardCanvas({ onExportImage }) {
   const [lineWidth, setLineWidth] = useState(3);
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState([]);
+  const [isSavingCld, setIsSavingCld] = useState(false);
+  const [cldToast, setCldToast] = useState(null);
 
   // Text Prompt Modal State (for box labeling or freeform text)
   const [textModal, setTextModal] = useState({
@@ -415,6 +419,39 @@ export default function WhiteboardCanvas({ onExportImage }) {
     saveSnapshot();
   };
 
+  const handleSaveToCloudinary = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setIsSavingCld(true);
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const res = await uploadToCloudinary({
+        file: dataUrl,
+        fileName: `napkin-sketch-${Date.now()}.png`,
+        folder: 'repo-blueprint/sketches',
+        tags: ['napkin_sketch', 'whiteboard', 'repoblueprint'],
+        userId: currentUser?.id,
+      });
+
+      addCloudinaryAsset(currentUser?.id, {
+        ...res,
+        title: 'Napkin Whiteboard Doodle',
+        type: 'sketch',
+      });
+
+      setCldToast({
+        show: true,
+        url: res.secure_url,
+        message: 'Saved to Cloudinary CDN!',
+      });
+      setTimeout(() => setCldToast(null), 5000);
+    } catch (err) {
+      alert(`Cloudinary save failed: ${err.message}`);
+    } finally {
+      setIsSavingCld(false);
+    }
+  };
+
   return (
     <div className="whiteboard-canvas-wrapper" ref={containerRef}>
       {/* 1. Main Toolbar */}
@@ -481,6 +518,15 @@ export default function WhiteboardCanvas({ onExportImage }) {
         <div className="wb-action-group">
           <button
             type="button"
+            className="wb-btn-ghost cld-whiteboard-btn"
+            onClick={handleSaveToCloudinary}
+            disabled={isSavingCld}
+            title="Upload napkin doodle directly to Cloudinary CDN"
+          >
+            {isSavingCld ? '☁️ Uploading...' : '☁️ Save to Cloudinary'}
+          </button>
+          <button
+            type="button"
             className="wb-btn-ghost"
             onClick={handleLoadSampleSketch}
             title="Load an example architecture napkin diagram"
@@ -506,6 +552,30 @@ export default function WhiteboardCanvas({ onExportImage }) {
           </button>
         </div>
       </div>
+
+      {cldToast && (
+        <div className="wb-cld-toast animate-fade-in">
+          <span>☁️ {cldToast.message}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => {
+              navigator.clipboard.writeText(cldToast.url);
+              alert('Copied Cloudinary CDN Link: ' + cldToast.url);
+            }}
+          >
+            🔗 Copy CDN URL
+          </button>
+          <a
+            href={cldToast.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-xs"
+          >
+            ↗ View
+          </a>
+        </div>
+      )}
 
       {/* 2. Quick Component Stencils (1-Click Stamped Architecture Blocks) */}
       <div className="whiteboard-stencils-row">

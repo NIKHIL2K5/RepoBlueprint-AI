@@ -3,6 +3,8 @@ import mermaid from 'mermaid';
 import './BlueprintDashboard.css';
 import { downloadProjectZip } from '../services/zipper';
 import { searchGitHubRepos } from '../services/github';
+import { uploadToCloudinary } from '../services/cloudinary';
+import { addCloudinaryAsset } from '../services/storageService';
 
 const setupMermaidTheme = () => {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -57,6 +59,7 @@ export default function BlueprintDashboard({
   onActiveTabChange,
   estimatedDau: externalDau,
   onDauChange,
+  currentUser,
 }) {
   const [internalActiveTab, setInternalActiveTab] = useState('blueprint');
   const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
@@ -69,6 +72,8 @@ export default function BlueprintDashboard({
   const [copiedMermaid, setCopiedMermaid] = useState(false);
   const [diagramZoom, setDiagramZoom] = useState(1);
   const [selectedFilePath, setSelectedFilePath] = useState(null);
+  const [isSavingDiagramToCld, setIsSavingDiagramToCld] = useState(false);
+  const [diagramCldToast, setDiagramCldToast] = useState(null);
 
   // Interactive Cost Calculator state
   const [internalDau, setInternalDau] = useState(5000);
@@ -181,6 +186,44 @@ export default function BlueprintDashboard({
     a.download = `${(understanding?.projectTitle || 'architecture').toLowerCase().replace(/\s+/g, '-')}-blueprint.svg`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveDiagramToCloudinary = async () => {
+    const svgElem = mermaidRef.current?.querySelector('svg');
+    if (!svgElem) {
+      alert('Mermaid diagram not yet rendered. Please wait a second.');
+      return;
+    }
+    setIsSavingDiagramToCld(true);
+    try {
+      const svgData = new XMLSerializer().serializeToString(svgElem);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const filename = `${(understanding?.projectTitle || 'architecture').toLowerCase().replace(/\s+/g, '-')}-diagram.svg`;
+      const res = await uploadToCloudinary({
+        file: blob,
+        fileName: filename,
+        folder: 'repo-blueprint/diagrams',
+        tags: ['architecture_diagram', 'mermaid_export'],
+        userId: currentUser?.id,
+      });
+
+      addCloudinaryAsset(currentUser?.id, {
+        ...res,
+        title: `${understanding?.projectTitle || 'System'} Architecture Diagram`,
+        type: 'diagram',
+      });
+
+      setDiagramCldToast({
+        show: true,
+        url: res.secure_url,
+        message: 'Architecture diagram saved to Cloudinary CDN!',
+      });
+      setTimeout(() => setDiagramCldToast(null), 5000);
+    } catch (err) {
+      alert(`Cloudinary upload failed: ${err.message}`);
+    } finally {
+      setIsSavingDiagramToCld(false);
+    }
   };
 
   const toggleMilestone = (milestoneKey) => {
@@ -368,6 +411,16 @@ export default function BlueprintDashboard({
                   title="Download vector SVG"
                 >
                   💾 Export SVG
+                </button>
+                <button
+                  type="button"
+                  className="diagram-btn"
+                  style={{ color: 'var(--accent)', fontWeight: 600 }}
+                  onClick={handleSaveDiagramToCloudinary}
+                  disabled={isSavingDiagramToCld}
+                  title="Upload vector architecture diagram to Cloudinary CDN"
+                >
+                  {isSavingDiagramToCld ? '☁️ Uploading...' : '☁️ Save to Cloudinary'}
                 </button>
               </div>
             </div>

@@ -3,6 +3,8 @@ import './InputStage.css';
 import WhiteboardCanvas from './WhiteboardCanvas';
 import VoiceDictation from './VoiceDictation';
 import { SAMPLE_IDEAS } from '../data/samples';
+import { uploadToCloudinary } from '../services/cloudinary';
+import { addCloudinaryAsset } from '../services/storageService';
 
 export default function InputStage({
   onSubmit,
@@ -10,6 +12,9 @@ export default function InputStage({
   onIdeaTextChange,
   activeTab: externalActiveTab,
   onActiveTabChange,
+  currentUser,
+  currentLanguage,
+  onLanguageChange,
 }) {
   const [internalActiveTab, setInternalActiveTab] = useState('sketch');
   const [internalIdeaText, setInternalIdeaText] = useState('');
@@ -27,6 +32,8 @@ export default function InputStage({
   const [imageMime, setImageMime] = useState(null);
   const [canvasBase64, setCanvasBase64] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [cldAsset, setCldAsset] = useState(null);
+  const [isCldUploading, setIsCldUploading] = useState(false);
 
   const handleImageFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -46,6 +53,30 @@ export default function InputStage({
       setImageMime(file.type);
     };
     reader.readAsDataURL(file);
+
+    // Direct background upload to Cloudinary CDN
+    setIsCldUploading(true);
+    uploadToCloudinary({
+      file,
+      fileName: file.name,
+      folder: 'repo-blueprint/uploads',
+      tags: ['vision_upload', 'architecture_input'],
+      userId: currentUser?.id,
+    })
+      .then((res) => {
+        setCldAsset(res);
+        addCloudinaryAsset(currentUser?.id, {
+          ...res,
+          title: file.name,
+          type: 'upload',
+        });
+      })
+      .catch((err) => {
+        console.warn('Cloudinary upload warning:', err);
+      })
+      .finally(() => {
+        setIsCldUploading(false);
+      });
   };
 
   const handleDrop = (e) => {
@@ -92,7 +123,12 @@ export default function InputStage({
       }
     }
 
-    onSubmit({ ideaText: combinedText, imageBase64: finalBase64, imageMime: finalMime });
+    onSubmit({
+      ideaText: combinedText,
+      imageBase64: finalBase64,
+      imageMime: finalMime,
+      cloudinaryUrl: cldAsset?.secure_url || null,
+    });
   };
 
   const canSubmit = ideaText.trim().length >= 2 || (activeTab === 'sketch' && canvasBase64) || imageBase64 !== null;
@@ -167,7 +203,10 @@ export default function InputStage({
         {/* 1. Whiteboard Canvas Tab */}
         {activeTab === 'sketch' && (
           <div className="input-body animate-slide-up">
-            <WhiteboardCanvas onExportImage={(b64) => setCanvasBase64(b64)} />
+            <WhiteboardCanvas
+              onExportImage={(b64) => setCanvasBase64(b64)}
+              currentUser={currentUser}
+            />
 
             {/* Enhanced Architecture Notes & Constraints Box */}
             <div className="sketch-notes-card">
@@ -247,6 +286,8 @@ export default function InputStage({
               onChange={setIdeaText}
               onAppend={(newText) => setIdeaText(prev => (prev ? prev + ' ' + newText : newText))}
               onSubmit={handleSubmit}
+              currentLanguage={currentLanguage}
+              onLanguageChange={onLanguageChange}
             />
             <div className="voice-transcript-wrapper">
               <div className="transcript-header-row">
@@ -329,6 +370,34 @@ export default function InputStage({
               {imagePreview ? (
                 <div className="dropzone__preview">
                   <img src={imagePreview} alt="Uploaded sketch" />
+                  {cldAsset && (
+                    <div className="dropzone__cld-badge" onClick={(e) => e.stopPropagation()}>
+                      <span>☁️ Synced to Cloudinary CDN</span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(cldAsset.secure_url);
+                          alert('Copied Cloudinary URL: ' + cldAsset.secure_url);
+                        }}
+                      >
+                        🔗 Copy Link
+                      </button>
+                      <a
+                        href={cldAsset.secure_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost btn-xs"
+                      >
+                        ↗ Open
+                      </a>
+                    </div>
+                  )}
+                  {isCldUploading && (
+                    <div className="dropzone__cld-uploading">
+                      <span>☁️ Syncing to Cloudinary CDN...</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     className="btn btn-ghost remove-btn"
@@ -337,6 +406,7 @@ export default function InputStage({
                       setImageFile(null);
                       setImagePreview(null);
                       setImageBase64(null);
+                      setCldAsset(null);
                     }}
                   >
                     ✕ Remove Image

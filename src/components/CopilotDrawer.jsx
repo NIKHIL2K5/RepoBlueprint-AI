@@ -1,17 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import './CopilotDrawer.css';
 import { sendChatMessage } from '../services/copilot';
+import { getUserChat, saveUserChat, addCloudinaryAsset } from '../services/storageService';
+import { uploadToCloudinary } from '../services/cloudinary';
 
-export const SUPPORTED_LANGUAGES = [
-  { code: 'en-US', name: 'English', native: 'English', flag: '🇺🇸' },
-  { code: 'hi-IN', name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
-  { code: 'te-IN', name: 'Telugu', native: 'తెలుగు', flag: '🇮🇳' },
-  { code: 'es-ES', name: 'Spanish', native: 'Español', flag: '🇪🇸' },
-  { code: 'fr-FR', name: 'French', native: 'Français', flag: '🇫🇷' },
-  { code: 'de-DE', name: 'German', native: 'Deutsch', flag: '🇩🇪' },
-  { code: 'ja-JP', name: 'Japanese', native: '日本語', flag: '🇯🇵' },
-  { code: 'zh-CN', name: 'Chinese', native: '中文', flag: '🇨🇳' },
-];
+import { SUPPORTED_LANGUAGES } from '../data/languages';
 
 const STAGE_QUICK_ACTIONS = {
   setup: [
@@ -47,26 +40,97 @@ export default function CopilotDrawer({
   appContext = {},
   onExecuteAction,
   config,
+  currentUser,
+  activeProjectId = 'global',
+  currentLanguage,
+  onLanguageChange,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputVal, setInputVal] = useState('');
-  const [selectedLang, setSelectedLang] = useState(SUPPORTED_LANGUAGES[0]); // default en-US
+  const [selectedLang, setSelectedLang] = useState(currentLanguage || SUPPORTED_LANGUAGES[0]); // default en-US
   const [speakingMsgId, setSpeakingMsgId] = useState(null);
   const [availableVoices, setAvailableVoices] = useState([]);
   const [autoApply, setAutoApply] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(true); // default audio ON!
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const [messages, setMessages] = useState(() => [
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: `👋 **Hello! I'm your AI Technical Co-Founder & Architecture Copilot.**\n\nI can speak and guide you in **multiple languages** (English, हिन्दी, తెలుగు, Español, Français, Deutsch, 日本語, 中文), explain trade-offs, and **take real actions on this page** (editing your ideas, selecting choices, switching tabs, or downloading your starter repo).`,
-      action: null,
-      actionApplied: false,
+  const [attachedImage, setAttachedImage] = useState(null);
+
+  // Sync selectedLang if parent changes language
+  useEffect(() => {
+    if (currentLanguage) {
+      setSelectedLang(currentLanguage);
     }
-  ]);
+  }, [currentLanguage]);
+
+  const [messages, setMessages] = useState(() => {
+    if (currentUser?.id) {
+      return getUserChat(currentUser.id, activeProjectId);
+    }
+    return [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: `👋 **Hello! I'm your AI Technical Co-Founder & Architecture Copilot.**\n\nI can speak and guide you in **multiple languages** (English, हिन्दी, తెలుగు, Español, Français, Deutsch, 日本語, 中文), explain trade-offs, and **take real actions on this page** (editing your ideas, selecting choices, switching tabs, or downloading your starter repo).`,
+        action: null,
+        actionApplied: false,
+      }
+    ];
+  });
+
+  // Reload chat history whenever user or project changes
+  useEffect(() => {
+    if (currentUser?.id) {
+      const saved = getUserChat(currentUser.id, activeProjectId);
+      if (saved && saved.length > 0) {
+        setMessages(saved);
+      }
+    }
+  }, [currentUser?.id, activeProjectId]);
+
+  const pushMessage = (newMsg) => {
+    setMessages(prev => {
+      const updated = [...prev, newMsg];
+      if (currentUser?.id) {
+        saveUserChat(currentUser.id, activeProjectId, updated);
+      }
+      return updated;
+    });
+  };
+
+  const handleAttachImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (re) => {
+      setAttachedImage({ file, preview: re.target.result, isUploading: true });
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const res = await uploadToCloudinary({
+        file,
+        fileName: file.name,
+        folder: 'repo-blueprint/chat-attachments',
+        tags: ['chat_attachment'],
+        userId: currentUser?.id,
+      });
+
+      addCloudinaryAsset(currentUser?.id, {
+        ...res,
+        title: `Chat Attachment: ${file.name}`,
+        type: 'upload',
+      });
+
+      setAttachedImage(prev => prev ? { ...prev, cldUrl: res.secure_url, isUploading: false } : null);
+    } catch (err) {
+      console.warn('Chat upload error:', err);
+      setAttachedImage(prev => prev ? { ...prev, isUploading: false } : null);
+    }
+  };
+
   const [isThinking, setIsThinking] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
@@ -337,20 +401,23 @@ export default function CopilotDrawer({
       id: 'usr-' + Date.now(),
       role: 'user',
       content: textToSend,
+      image: attachedImage?.cldUrl || attachedImage?.preview || null,
+      timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setAttachedImage(null);
+    pushMessage(userMsg);
     setIsThinking(true);
 
     const safetyTimer = setTimeout(() => {
       setIsThinking(false);
-    }, 9000);
+    }, 30000);
 
     try {
       const res = await sendChatMessage({
         config,
         history: [...messages, userMsg],
-        userMessage: textToSend,
+        userMessage: textToSend + (userMsg.image ? ` [Attached image hosted on Cloudinary: ${userMsg.image}]` : ''),
         appContext: {
           ...appContext,
           languageCode: selectedLang.code,
@@ -374,9 +441,10 @@ export default function CopilotDrawer({
         content: res.text,
         action: res.action,
         actionApplied: applied,
+        timestamp: new Date().toISOString(),
       };
 
-      setMessages(prev => [...prev, assistantMsg]);
+      pushMessage(assistantMsg);
 
       // Automatic Audio Speech Out in chosen language if TTS enabled!
       if (ttsEnabled) {
@@ -387,14 +455,12 @@ export default function CopilotDrawer({
         setUnreadCount(c => c + 1);
       }
     } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: 'err-' + Date.now(),
-          role: 'assistant',
-          content: `⚠️ Error communicating with AI: ${err.message || 'Please try again.'}`,
-        }
-      ]);
+      pushMessage({
+        id: 'err-' + Date.now(),
+        role: 'assistant',
+        content: `⚠️ Error communicating with AI: ${err.message || 'Please try again.'}`,
+        timestamp: new Date().toISOString(),
+      });
     } finally {
       clearTimeout(safetyTimer);
       setIsThinking(false);
@@ -525,7 +591,10 @@ export default function CopilotDrawer({
                   value={selectedLang.code}
                   onChange={(e) => {
                     const found = SUPPORTED_LANGUAGES.find(l => l.code === e.target.value);
-                    if (found) setSelectedLang(found);
+                    if (found) {
+                      setSelectedLang(found);
+                      if (onLanguageChange) onLanguageChange(found);
+                    }
                   }}
                   aria-label="Choose Language"
                 >
@@ -563,6 +632,20 @@ export default function CopilotDrawer({
                 {messages.map(msg => (
                   <div key={msg.id} className={`copilot-bubble copilot-bubble--${msg.role}`}>
                     <div className="bubble-content">
+                      {msg.image && (
+                        <div className="bubble-img-wrap" style={{ marginBottom: 8 }}>
+                          <a href={msg.image} target="_blank" rel="noreferrer">
+                            <img
+                              src={msg.image}
+                              alt="Attachment"
+                              style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, display: 'block', border: '1px solid var(--border)' }}
+                            />
+                          </a>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--accent)', marginTop: 4, display: 'inline-block' }}>
+                            ☁️ Cloudinary CDN Hosted
+                          </span>
+                        </div>
+                      )}
                       {formatMessage(msg.content)}
                     </div>
 
@@ -632,6 +715,21 @@ export default function CopilotDrawer({
 
               {/* Input Footer */}
               <div className="copilot-input-area">
+                {attachedImage && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '4px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: '0.78rem' }}>
+                    <img src={attachedImage.preview} alt="Attached" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} />
+                    <span style={{ flex: 1, color: 'var(--accent)' }}>
+                      {attachedImage.isUploading ? '☁️ Uploading to Cloudinary...' : '☁️ Cloudinary CDN attached'}
+                    </span>
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                      onClick={() => setAttachedImage(null)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 {isListening && (
                   <div className="copilot-listening-banner" style={{ fontSize: '0.8rem', color: '#ea580c', padding: '4px 10px', background: 'rgba(234, 88, 12, 0.12)', border: '1px solid rgba(234, 88, 12, 0.25)', borderRadius: '6px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 8px #ef4444' }} />
@@ -639,6 +737,15 @@ export default function CopilotDrawer({
                   </div>
                 )}
                 <div className="copilot-input-wrapper">
+                  <label className="copilot-mic-btn" style={{ cursor: 'pointer' }} title="Attach image / sketch via Cloudinary">
+                    📎
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleAttachImage}
+                    />
+                  </label>
                   <input
                     type="text"
                     className="copilot-input"
@@ -665,7 +772,7 @@ export default function CopilotDrawer({
                     type="button"
                     className="copilot-send-btn"
                     onClick={() => handleSend()}
-                    disabled={isThinking || !inputVal.trim()}
+                    disabled={isThinking || (!inputVal.trim() && !attachedImage)}
                     title="Send message"
                   >
                     ➤

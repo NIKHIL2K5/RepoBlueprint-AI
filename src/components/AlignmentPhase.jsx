@@ -11,6 +11,8 @@ export default function AlignmentPhase({
   onAnswersChange,
   additionalNotes: externalNotes,
   onNotesChange,
+  currentLanguage,
+  onLanguageChange,
 }) {
   const [internalAnswers, setInternalAnswers] = useState({});
   const answers = externalAnswers !== undefined ? externalAnswers : internalAnswers;
@@ -132,6 +134,11 @@ export default function AlignmentPhase({
           Here is how the AI synthesized your idea. Review the generated project identity,
           explore pros & cons, market benchmarks, and open-source foundations before generating your repository.
         </p>
+        {currentLanguage && currentLanguage.code !== 'en-US' && (
+          <div className="alignment-lang-badge" style={{ marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid var(--accent)', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+            <span>🌐 System aligned for {currentLanguage.flag} {currentLanguage.native} ({currentLanguage.name})</span>
+          </div>
+        )}
       </div>
 
       {/* 1. Generated Idea Name, One-Liner & Deep Description Card */}

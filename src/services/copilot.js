@@ -17,7 +17,7 @@ export async function sendChatMessage({ config, history = [], userMessage, appCo
     try {
       const result = await Promise.race([
         callOllamaChat(config, systemPrompt, history, userMessage, appContext),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Ollama generation timed out (8s limit)')), 8000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Ollama generation timed out (25s limit)')), 25000))
       ]);
       return result;
     } catch (ollamaErr) {
@@ -159,10 +159,21 @@ async function callOllamaChat(config, systemPrompt, history, userMessage, appCon
   const chatUrl = isLocalhost ? '/ollama/api/chat' : `${baseUrl}/api/chat`;
   const model = config.ollamaModel || 'llama3.2:3b';
 
-  // Build compact system instructions for snappy local CPU inference
+  // Build compact system instructions with explicit multilingual mandate
   const stage = appContext?.stage || 'dashboard';
   const projectTitle = appContext?.understanding?.projectTitle || 'Production System';
-  const compactSystem = `${systemPrompt.slice(0, 600)}\nCURRENT_STAGE: ${stage.toUpperCase()}\nPROJECT: "${projectTitle}"\nIMPORTANT: If user asks to change or convert to mobile app (React Native / iOS / Android), include <<<ACTION>>>{"type": "UPDATE_TECH_STACK", "params": {"layer": "frontend", "name": "React Native (Expo SDK 52)", "reason": "Cross-platform iOS and Android mobile app"}, "label": "📱 Convert to Mobile App (React Native)"}<<<ENDACTION>>>.`;
+  const langCode = appContext?.languageCode || 'en-US';
+  const langName = appContext?.languageName || 'English';
+  const langDirective = (langCode !== 'en-US' && langName !== 'English')
+    ? `CRITICAL MULTILINGUAL MANDATE: The user has selected ${langName} (${langCode}). You MUST write your entire conversational response and explanation in fluent ${langName}. Keep technical keywords, library names, and code syntax in English.`
+    : 'Respond concisely and helpfully in English.';
+
+  const compactSystem = `You are RepoBlueprint's Principal AI Architecture Co-Founder Copilot.
+${langDirective}
+CURRENT_STAGE: ${stage.toUpperCase()}
+ACTIVE_PROJECT: "${projectTitle}"
+${systemPrompt.slice(0, 1500)}
+IMPORTANT: If user asks to change or convert to mobile app (React Native / iOS / Android), include <<<ACTION>>>{"type": "UPDATE_TECH_STACK", "params": {"layer": "frontend", "name": "React Native (Expo SDK 52)", "reason": "Cross-platform iOS and Android mobile app"}, "label": "📱 Convert to Mobile App (React Native)"}<<<ENDACTION>>>.`;
 
   // Build messages array for proper multi-turn chat API
   const messages = [
@@ -177,12 +188,12 @@ async function callOllamaChat(config, systemPrompt, history, userMessage, appCon
   const res = await fetch(chatUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(7500),
+    signal: AbortSignal.timeout(25000),
     body: JSON.stringify({
       model,
       messages,
       stream: false,
-      options: { temperature: 0.7, num_predict: 256 }
+      options: { temperature: 0.7, num_predict: 350 }
     })
   });
 

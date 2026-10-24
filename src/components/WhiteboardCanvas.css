@@ -317,3 +317,28 @@
   gap: 8px;
   margin-top: 6px;
 }
+
+.cld-whiteboard-btn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cld-whiteboard-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.wb-cld-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-soft);
+}
+

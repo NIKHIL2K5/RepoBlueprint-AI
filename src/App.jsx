@@ -9,9 +9,21 @@ import BlueprintDashboard from './components/BlueprintDashboard';
 import LoadingScreen from './components/LoadingScreen';
 import CopilotDrawer from './components/CopilotDrawer';
 import ThemeToggle from './components/ThemeToggle';
+import AuthModal from './components/AuthModal';
+import CloudinaryModal from './components/CloudinaryModal';
+import { getCurrentUser } from './services/authService';
+import {
+  getUserWorkspace,
+  getUserProjects,
+  saveOrUpdateProject,
+  deleteUserProject,
+  saveUserDraft,
+  saveUserWorkspace,
+} from './services/storageService';
 import { understandIdea, generateMasterBlueprint } from './services/gemini';
 import { downloadProjectZip } from './services/zipper';
 import { SAMPLE_IDEAS } from './data/samples';
+import { SUPPORTED_LANGUAGES } from './data/languages';
 
 const STATE = {
   SETUP:    'setup',
@@ -24,6 +36,11 @@ const STATE = {
 };
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [cloudinaryModalOpen, setCloudinaryModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+
   const [config, setConfig] = useState(() => {
     try {
       const saved = localStorage.getItem('rb_config');
@@ -37,18 +54,47 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
-  // Saved projects history and active project tracking with localStorage
-  const [savedProjects, setSavedProjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem('rb_saved_projects');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
+  // Global multilingual state synced with user preferences
+  const [currentLanguage, setCurrentLanguage] = useState(() => {
+    if (currentUser?.id) {
+      const ws = getUserWorkspace(currentUser.id);
+      if (ws.preferences?.language) {
+        const found = SUPPORTED_LANGUAGES.find(l => l.code === ws.preferences.language);
+        if (found) return found;
+      }
     }
+    const saved = localStorage.getItem('rb_language');
+    if (saved) {
+      const found = SUPPORTED_LANGUAGES.find(l => l.code === saved);
+      if (found) return found;
+    }
+    return SUPPORTED_LANGUAGES[0];
+  });
+
+  const handleLanguageChange = (newLang) => {
+    setCurrentLanguage(newLang);
+    localStorage.setItem('rb_language', newLang.code);
+    if (currentUser?.id) {
+      const ws = getUserWorkspace(currentUser.id);
+      ws.preferences = { ...(ws.preferences || {}), language: newLang.code };
+      saveUserWorkspace(currentUser.id, ws);
+    }
+  };
+
+  // Saved projects history and active project tracking with isolated multi-user storage
+  const [savedProjects, setSavedProjects] = useState(() => {
+    if (currentUser?.id) {
+      return getUserProjects(currentUser.id);
+    }
+    return [];
   });
 
   const [activeProjectId, setActiveProjectId] = useState(() => {
-    return localStorage.getItem('rb_active_project_id') || '';
+    if (currentUser?.id) {
+      const ws = getUserWorkspace(currentUser.id);
+      return ws.activeProjectId || '';
+    }
+    return '';
   });
 
   const [appState,      setAppState]      = useState(config ? STATE.INPUT : STATE.SETUP);
@@ -60,6 +106,10 @@ export default function App() {
 
   // Controlled states for deep Copilot action interaction with draft persistence
   const [inputIdeaText,    setInputIdeaText]    = useState(() => {
+    if (currentUser?.id) {
+      const ws = getUserWorkspace(currentUser.id);
+      if (ws.draftIdea) return ws.draftIdea;
+    }
     try {
       return localStorage.getItem('rb_draft_idea') || '';
     } catch {
@@ -74,11 +124,46 @@ export default function App() {
 
   const handleIdeaTextChange = (text) => {
     setInputIdeaText(text);
+    if (currentUser?.id) {
+      saveUserDraft(currentUser.id, text);
+    }
     try {
       localStorage.setItem('rb_draft_idea', text);
     } catch (e) {
       console.warn('Failed to save draft:', e);
     }
+  };
+
+  const handleUserChange = (newUser) => {
+    setCurrentUser(newUser);
+    if (!newUser) {
+      setSavedProjects([]);
+      setActiveProjectId('');
+      setUnderstanding(null);
+      setBlueprint(null);
+      setAppState(STATE.INPUT);
+      return;
+    }
+
+    const ws = getUserWorkspace(newUser.id);
+    const projects = ws.projects || [];
+    setSavedProjects(projects);
+    setActiveProjectId(ws.activeProjectId || '');
+    setInputIdeaText(ws.draftIdea || '');
+
+    if (ws.activeProjectId && projects.length > 0) {
+      const match = projects.find(p => p.id === ws.activeProjectId);
+      if (match && match.blueprint && match.understanding) {
+        setUnderstanding(match.understanding);
+        setBlueprint(match.blueprint);
+        if (config) setAppState(STATE.DASH);
+        return;
+      }
+    }
+
+    setUnderstanding(null);
+    setBlueprint(null);
+    if (config) setAppState(STATE.INPUT);
   };
 
   // Restore active project on mount if previously viewed
@@ -137,7 +222,7 @@ export default function App() {
       setLoadingStage(6);
       setBlueprint(result);
 
-      // Save new project to history and active state in localStorage
+      // Save new project to history and active state in isolated user workspace
       const projectId = 'proj_' + Date.now();
       const newProject = {
         id: projectId,
@@ -149,19 +234,17 @@ export default function App() {
         blueprint: result,
       };
 
-      setSavedProjects(prev => {
-        const updated = [newProject, ...prev.filter(p => p.title !== newProject.title && p.id !== projectId)];
-        try {
-          localStorage.setItem('rb_saved_projects', JSON.stringify(updated.slice(0, 50)));
-        } catch (e) {
-          console.warn('Failed to save project:', e);
-        }
-        return updated;
-      });
+      if (currentUser?.id) {
+        saveOrUpdateProject(currentUser.id, newProject);
+        const updated = getUserProjects(currentUser.id);
+        setSavedProjects(updated);
+        const ws = getUserWorkspace(currentUser.id);
+        ws.activeProjectId = projectId;
+        saveUserWorkspace(currentUser.id, ws);
+      } else {
+        setSavedProjects(prev => [newProject, ...prev]);
+      }
       setActiveProjectId(projectId);
-      try {
-        localStorage.setItem('rb_active_project_id', projectId);
-      } catch {}
 
       setTimeout(() => setAppState(STATE.DASH), 500);
     } catch (err) {
@@ -227,13 +310,18 @@ export default function App() {
   };
 
   const handleDeleteProject = (projectId) => {
-    setSavedProjects(prev => {
-      const updated = prev.filter(p => p.id !== projectId);
-      try {
-        localStorage.setItem('rb_saved_projects', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+    if (currentUser?.id) {
+      const updated = deleteUserProject(currentUser.id, projectId);
+      setSavedProjects(updated);
+    } else {
+      setSavedProjects(prev => {
+        const updated = prev.filter(p => p.id !== projectId);
+        try {
+          localStorage.setItem('rb_saved_projects', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
     if (activeProjectId === projectId) {
       handleReset();
     }
@@ -484,6 +572,8 @@ export default function App() {
     blueprint,
     dashboardTab,
     dau: estimatedDau,
+    languageCode: currentLanguage.code,
+    languageName: currentLanguage.name,
   };
 
   // Setup screen: full-page, no sidebar
@@ -517,6 +607,12 @@ export default function App() {
         savedProjects={savedProjects}
         config={config}
         onOpenSettings={handleLogout}
+        currentUser={currentUser}
+        onOpenAuth={() => {
+          setAuthMode('profile');
+          setAuthModalOpen(true);
+        }}
+        onOpenCloudinary={() => setCloudinaryModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -556,6 +652,46 @@ export default function App() {
                     : `🦙 ${config.ollamaModel || 'Ollama'}`}
               </div>
             )}
+            <button
+              type="button"
+              className="btn btn-ghost topbar-cld-btn"
+              onClick={() => setCloudinaryModalOpen(true)}
+              title="Cloudinary Media Asset Vault & Config"
+            >
+              ☁️ Cloudinary
+            </button>
+            {currentUser && (
+              <button
+                type="button"
+                className="topbar-user-badge"
+                onClick={() => {
+                  setAuthMode('profile');
+                  setAuthModalOpen(true);
+                }}
+                title={`User: ${currentUser.fullName} (@${currentUser.username})`}
+              >
+                <img src={currentUser.avatarUrl} alt="" className="topbar-user-avatar" />
+                <span className="topbar-user-name">{currentUser.username}</span>
+              </button>
+            )}
+            <div className="topbar-lang-selector" title="Switch Website & Copilot Language">
+              <select
+                id="topbar-language-select"
+                className="topbar-lang-select"
+                value={currentLanguage.code}
+                onChange={(e) => {
+                  const match = SUPPORTED_LANGUAGES.find(l => l.code === e.target.value);
+                  if (match) handleLanguageChange(match);
+                }}
+                aria-label="Select website language"
+              >
+                {SUPPORTED_LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.native} ({lang.name})
+                  </option>
+                ))}
+              </select>
+            </div>
             {appState === STATE.DASH && (
               <button className="btn btn-secondary" onClick={handleReset} id="new-blueprint-btn">
                 + New Blueprint
@@ -580,6 +716,9 @@ export default function App() {
               onIdeaTextChange={handleIdeaTextChange}
               activeTab={inputTab}
               onActiveTabChange={setInputTab}
+              currentUser={currentUser}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
             />
           )}
 
@@ -593,6 +732,8 @@ export default function App() {
               onAnswersChange={setAlignmentAnswers}
               additionalNotes={alignmentNotes}
               onNotesChange={setAlignmentNotes}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
             />
           )}
 
@@ -605,6 +746,9 @@ export default function App() {
               onActiveTabChange={setDashboardTab}
               estimatedDau={estimatedDau}
               onDauChange={setEstimatedDau}
+              currentUser={currentUser}
+              currentLanguage={currentLanguage}
+              onLanguageChange={handleLanguageChange}
             />
           )}
 
@@ -649,6 +793,27 @@ export default function App() {
         appContext={copilotAppContext}
         onExecuteAction={handleExecuteAction}
         config={config}
+        currentUser={currentUser}
+        activeProjectId={activeProjectId}
+        currentLanguage={currentLanguage}
+        onLanguageChange={handleLanguageChange}
+      />
+
+      {/* Multi-User Authentication & Profile Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onUserChange={handleUserChange}
+        initialMode={authMode}
+      />
+
+      {/* Cloudinary Media Vault & Credentials Modal */}
+      <CloudinaryModal
+        isOpen={cloudinaryModalOpen}
+        onClose={() => setCloudinaryModalOpen(false)}
+        currentUser={currentUser}
+        activeProjectId={activeProjectId}
       />
     </div>
   );

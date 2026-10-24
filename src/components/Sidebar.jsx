@@ -1,61 +1,101 @@
 import { useState, useMemo } from 'react';
 import './Sidebar.css';
 import ThemeToggle from './ThemeToggle';
-
-const DEFAULT_RECENTS = [
-  {
-    group: 'Today',
-    items: [
-      { id: 'habit', title: 'HabitForge AI — Habit Coach', tag: 'Fullstack' },
-      { id: 'video', title: 'Decentralized Video Streaming', tag: 'WebRTC' },
-      { id: 'whiteboard', title: 'Napkin Whiteboard Doodle', tag: 'Vision' },
-    ]
-  },
-  {
-    group: 'Yesterday',
-    items: [
-      { id: 'oss', title: 'Autonomous GitHub Triage Bot', tag: 'AI Bot' },
-      { id: 'fastapi', title: 'FastAPI + Postgres Starter', tag: 'Backend' },
-    ]
-  },
-  {
-    group: 'Previous 7 days',
-    items: [
-      { id: 'devops', title: 'DevOps Multi-Cluster Wizard', tag: 'Docker' },
-      { id: 'market', title: 'Market Intelligence Explorer', tag: 'Analytics' },
-    ]
-  }
-];
+import { SAMPLE_IDEAS } from '../data/samples';
 
 export default function Sidebar({
   isOpen = true,
   onToggle,
   onNewProject,
-  activeProjectId = 'habit',
+  activeProjectId = '',
   onSelectProject,
+  onDeleteProject,
+  savedProjects = [],
   config,
   onOpenSettings,
+  currentUser,
+  onOpenAuth,
+  onOpenCloudinary,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim()) return DEFAULT_RECENTS;
-    const q = searchQuery.toLowerCase();
-    return DEFAULT_RECENTS.map(g => ({
-      ...g,
-      items: g.items.filter(item => item.title.toLowerCase().includes(q) || item.tag.toLowerCase().includes(q))
-    })).filter(g => g.items.length > 0);
-  }, [searchQuery]);
+  // Combine user's saved projects with preset reference blueprints
+  const groupedProjects = useMemo(() => {
+    const list = [];
 
-  const modelLabel = config?.provider === 'ollama'
-    ? `Ollama · ${config?.ollamaModel || 'llama3.2:3b'}`
-    : config?.provider === 'gemini'
+    // 1. User's custom saved blueprints
+    if (savedProjects && savedProjects.length > 0) {
+      const now = new Date();
+      const today = [];
+      const yesterday = [];
+      const earlier = [];
+
+      savedProjects.forEach(proj => {
+        const pDate = proj.date || proj.createdAt ? new Date(proj.date || proj.createdAt) : null;
+        if (!pDate || isNaN(pDate.getTime())) {
+          today.push({
+            id: proj.id,
+            title: proj.title || 'Custom Architecture Blueprint',
+            tag: proj.tag || 'Custom',
+            isUserProject: true,
+          });
+          return;
+        }
+
+        const diffDays = Math.floor((now - pDate) / (1000 * 60 * 60 * 24));
+        const item = {
+          id: proj.id,
+          title: proj.title || 'Custom Architecture Blueprint',
+          tag: proj.tag || 'Custom',
+          isUserProject: true,
+        };
+
+        if (diffDays === 0) today.push(item);
+        else if (diffDays === 1) yesterday.push(item);
+        else earlier.push(item);
+      });
+
+      if (today.length > 0) list.push({ group: 'Today', items: today });
+      if (yesterday.length > 0) list.push({ group: 'Yesterday', items: yesterday });
+      if (earlier.length > 0) list.push({ group: 'Earlier Blueprints', items: earlier });
+    }
+
+    // 2. Preset reference blueprints from library
+    const presets = SAMPLE_IDEAS.map(s => ({
+      id: s.id,
+      title: s.title,
+      tag: s.tag,
+      isUserProject: false,
+    }));
+
+    list.push({ group: 'Reference Blueprints', items: presets });
+
+    // Apply search filter if query is entered
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list
+      .map(g => ({
+        ...g,
+        items: g.items.filter(
+          item =>
+            item.title.toLowerCase().includes(q) ||
+            item.tag.toLowerCase().includes(q)
+        ),
+      }))
+      .filter(g => g.items.length > 0);
+  }, [savedProjects, searchQuery]);
+
+  const modelLabel =
+    config?.provider === 'ollama'
+      ? `Ollama · ${config?.ollamaModel || 'llama3.2:3b'}`
+      : config?.provider === 'gemini'
       ? `Gemini · ${config?.geminiModel || '2.5 Flash'}`
       : 'Instant Sandbox';
 
-  const modelIcon = config?.provider === 'ollama'
-    ? '🦙'
-    : config?.provider === 'gemini'
+  const modelIcon =
+    config?.provider === 'ollama'
+      ? '🦙'
+      : config?.provider === 'gemini'
       ? '✨'
       : '⚡';
 
@@ -68,7 +108,6 @@ export default function Sidebar({
         {/* Header / Brand */}
         <div className="sidebar-header">
           <div className="sidebar-brand" onClick={onNewProject} title="RepoBlueprint AI Home">
-            {/* Minimalist Editorial Terracotta Logo Mark */}
             <div className="sidebar-logo-mark" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
@@ -94,7 +133,23 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Primary CTA: New Project / New Chat */}
+        {/* User Profile Card */}
+        {currentUser && (
+          <div className="sidebar-user-card" onClick={onOpenAuth} title="Click to view profile or switch account">
+            <img
+              src={currentUser.avatarUrl}
+              alt={currentUser.fullName}
+              className="sidebar-user-avatar"
+            />
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{currentUser.fullName}</span>
+              <span className="sidebar-user-role">@{currentUser.username} · {currentUser.role}</span>
+            </div>
+            <span className="sidebar-user-menu-icon" title="Switch User">⇄</span>
+          </div>
+        )}
+
+        {/* Primary CTAs: New Blueprint + Cloudinary Vault */}
         <div className="sidebar-actions">
           <button
             type="button"
@@ -104,6 +159,16 @@ export default function Sidebar({
           >
             <span className="plus-icon">＋</span>
             <span>New Blueprint</span>
+          </button>
+          
+          <button
+            type="button"
+            className="sidebar-cld-vault-btn"
+            onClick={onOpenCloudinary}
+            title="Open Cloudinary Media Vault"
+          >
+            <span className="cld-icon">☁️</span>
+            <span>Cloudinary Vault</span>
           </button>
         </div>
 
@@ -116,7 +181,7 @@ export default function Sidebar({
             </svg>
             <input
               type="search"
-              placeholder="Search projects..."
+              placeholder="Search blueprints..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="sidebar-search-input"
@@ -133,29 +198,48 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Recent Items grouped by Today / Yesterday / Previous 7 days */}
+        {/* Recents & Blueprints List */}
         <div className="sidebar-recents-list">
-          {filteredGroups.map(group => (
+          {groupedProjects.map(group => (
             <div key={group.group} className="recents-group">
               <div className="recents-group-title">{group.group}</div>
               <div className="recents-items">
                 {group.items.map(item => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    className={`recent-item-btn ${activeProjectId === item.id ? 'is-active' : ''}`}
-                    onClick={() => onSelectProject && onSelectProject(item)}
-                    title={item.title}
+                    className={`recent-item-row ${activeProjectId === item.id ? 'is-active' : ''}`}
                   >
-                    <span className="recent-item-title">{item.title}</span>
-                    <span className="recent-item-tag">{item.tag}</span>
-                  </button>
+                    <button
+                      type="button"
+                      className="recent-item-btn"
+                      onClick={() => onSelectProject && onSelectProject(item)}
+                      title={item.title}
+                    >
+                      <span className="recent-item-title">{item.title}</span>
+                      <span className="recent-item-tag">{item.tag}</span>
+                    </button>
+                    {item.isUserProject && onDeleteProject && (
+                      <button
+                        type="button"
+                        className="recent-item-del-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete saved blueprint "${item.title}"?`)) {
+                            onDeleteProject(item.id);
+                          }
+                        }}
+                        title="Delete blueprint"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
           ))}
 
-          {filteredGroups.length === 0 && (
+          {groupedProjects.length === 0 && (
             <div className="recents-empty">No projects match "{searchQuery}"</div>
           )}
         </div>
@@ -182,6 +266,14 @@ export default function Sidebar({
           </div>
 
           <div className="sidebar-footer-row">
+            <button
+              type="button"
+              className="sidebar-account-btn"
+              onClick={onOpenAuth}
+              title="Manage Account / Switch User"
+            >
+              👤 Switch User
+            </button>
             <ThemeToggle className="sidebar-theme-toggle" />
           </div>
         </div>
