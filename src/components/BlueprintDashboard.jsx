@@ -364,7 +364,7 @@ export default function BlueprintDashboard({
       </div>
 
       {/* Tabs Row */}
-      <div className="tab-list dashboard-tabs animate-slide-up" role="tablist">
+      <div className="tab-list dashboard-tabs animate-slide-up" role="tablist" aria-label="Blueprint Dashboard Tabs">
         {TABS.map(tab => (
           <button
             key={tab.id}
@@ -373,6 +373,8 @@ export default function BlueprintDashboard({
             className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
             id={`tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls={`tabpanel-${tab.id}`}
           >
             {tab.icon} {tab.label}
           </button>

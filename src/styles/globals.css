@@ -9,23 +9,23 @@
   --bg-sidebar:     #F5F4ED;
   --surface:        #FFFFFF;
   --surface-hover:  #F0EEE6;
-  --border:         #E8E6DC;
+  --border:         #DEDBD2;
   --text-primary:   #141413;
-  --text-secondary: #5E5D59;
-  --text-muted:     #87867F;
-  --accent:         #D97757;
-  --accent-button:  #C96442;
-  --accent-hover:   #B85736;
+  --text-secondary: #4D4C48;
+  --text-muted:     #61605B;
+  --accent:         #BA4E2A;
+  --accent-button:  #BA4E2A;
+  --accent-hover:   #A64220;
   --accent-soft:    #F5E0D6;
   --user-bubble:    #F0EEE6;
 
   /* Supporting Accent Hues */
-  --olive:          #788C5D;
-  --sky:            #6A9BCB;
-  --fig:            #C46686;
-  --cactus:         #BCD1CA;
-  --heather:        #CBCADB;
-  --oat:            #E3DACC;
+  --olive:          #596E40;
+  --sky:            #3B6E9E;
+  --fig:            #A14363;
+  --cactus:         #3D6B5E;
+  --heather:        #5E5C78;
+  --oat:            #665D4F;
 
   /* Typography */
   --font-serif:     'Newsreader', 'Source Serif 4', Georgia, serif;
@@ -45,10 +45,10 @@
   --shadow-subtle:  0 1px 3px rgba(20, 20, 19, 0.04);
   --shadow-soft:    0 2px 12px rgba(20, 20, 19, 0.06);
   --shadow-float:   0 8px 24px rgba(20, 20, 19, 0.08);
-  --shadow-input-focus: 0 4px 16px rgba(217, 119, 87, 0.12);
+  --shadow-input-focus: 0 4px 16px rgba(186, 78, 42, 0.15);
 
   /* Focus Ring */
-  --focus-ring:     0 0 0 3px rgba(217, 119, 87, 0.25);
+  --focus-ring:     0 0 0 3px rgba(186, 78, 42, 0.35);
 
   /* Transitions */
   --transition:     150ms ease;
@@ -75,13 +75,13 @@
   --bg-sidebar:     #1F1E1D;
   --surface:        #30302E;
   --surface-hover:  #3A3936;
-  --border:         #3E3D3A;
+  --border:         #474541;
   --text-primary:   #F5F4ED;
-  --text-secondary: #C2C0B6;
-  --text-muted:     #8F8D85;
-  --accent:         #D97757;
-  --accent-button:  #D97757;
-  --accent-hover:   #E58A6C;
+  --text-secondary: #D4D2C9;
+  --text-muted:     #A8A69D;
+  --accent:         #E07856;
+  --accent-button:  #E07856;
+  --accent-hover:   #EC8E6E;
   --accent-soft:    #3D2B24;
   --user-bubble:    #3A3936;
 
@@ -89,8 +89,8 @@
   --shadow-subtle:  0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-soft:    0 2px 12px rgba(0, 0, 0, 0.25);
   --shadow-float:   0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-input-focus: 0 4px 16px rgba(217, 119, 87, 0.2);
-  --focus-ring:     0 0 0 3px rgba(217, 119, 87, 0.35);
+  --shadow-input-focus: 0 4px 16px rgba(224, 120, 86, 0.25);
+  --focus-ring:     0 0 0 3px rgba(224, 120, 86, 0.45);
 }
 
 /* ── Reset & Baseline ── */

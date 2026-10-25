@@ -174,12 +174,22 @@
 
 .clear-search-btn {
   position: absolute;
-  right: 8px;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
 }
 
 /* Recents List */
@@ -475,14 +485,21 @@
 .recent-item-del-btn {
   background: none;
   border: none;
-  padding: 4px 6px;
-  font-size: 0.72rem;
+  padding: 4px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--transition), color var(--transition);
   border-radius: var(--radius-sm);
   margin-right: 4px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .recent-item-row:hover .recent-item-del-btn {

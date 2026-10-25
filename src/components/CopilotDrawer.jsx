@@ -555,6 +555,7 @@ export default function CopilotDrawer({
                   type="button"
                   className="ctrl-icon-btn"
                   onClick={() => setIsMinimized(!isMinimized)}
+                  aria-label={isMinimized ? 'Expand Drawer' : 'Minimize Drawer'}
                   title={isMinimized ? 'Expand Drawer' : 'Minimize Drawer'}
                 >
                   {isMinimized ? '▲' : '▼'}
@@ -568,6 +569,7 @@ export default function CopilotDrawer({
                     stopAudio();
                     setIsOpen(false);
                   }}
+                  aria-label="Close Copilot Drawer"
                   title="Close Copilot"
                 >
                   ✕
@@ -725,6 +727,8 @@ export default function CopilotDrawer({
                       type="button"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
                       onClick={() => setAttachedImage(null)}
+                      aria-label="Remove attached image"
+                      title="Remove image"
                     >
                       ✕
                     </button>
@@ -756,6 +760,7 @@ export default function CopilotDrawer({
                       if (e.key === 'Enter') handleSend();
                     }}
                     disabled={isThinking}
+                    aria-label="Message technical co-founder copilot"
                   />
 
                   {/* Built-in Voice Dictation Button (Configured to selected language) */}
@@ -763,6 +768,7 @@ export default function CopilotDrawer({
                     type="button"
                     className={`copilot-mic-btn ${isListening ? 'listening' : ''}`}
                     onClick={toggleVoice}
+                    aria-label={isListening ? 'Stop Listening' : `Speak in ${selectedLang.native} (${selectedLang.code})`}
                     title={isListening ? 'Stop Listening' : `Speak in ${selectedLang.native} (${selectedLang.code})`}
                   >
                     {isListening ? '⏹️' : '🎙️'}
@@ -773,6 +779,7 @@ export default function CopilotDrawer({
                     className="copilot-send-btn"
                     onClick={() => handleSend()}
                     disabled={isThinking || (!inputVal.trim() && !attachedImage)}
+                    aria-label="Send message to copilot"
                     title="Send message"
                   >
                     ➤

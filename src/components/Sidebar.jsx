@@ -185,12 +185,15 @@ export default function Sidebar({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="sidebar-search-input"
+              aria-label="Search blueprints"
             />
             {searchQuery && (
               <button
                 type="button"
                 className="clear-search-btn"
                 onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                title="Clear search"
               >
                 ✕
               </button>
@@ -228,6 +231,7 @@ export default function Sidebar({
                             onDeleteProject(item.id);
                           }
                         }}
+                        aria-label={`Delete blueprint ${item.title}`}
                         title="Delete blueprint"
                       >
                         ✕
@@ -259,6 +263,7 @@ export default function Sidebar({
               type="button"
               className="btn-icon sidebar-settings-btn"
               onClick={onOpenSettings}
+              aria-label="Configure AI Engine"
               title="Configure AI Engine"
             >
               ⚙️

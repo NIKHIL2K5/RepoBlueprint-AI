@@ -179,7 +179,7 @@ export default function InputStage({
       {/* Main Input Card */}
       <div className="input-panel card animate-slide-up delay-2">
         {/* Tab switcher */}
-        <div className="tab-list" role="tablist">
+        <div className="tab-list" role="tablist" aria-label="Input Method Tabs">
           {[
             { id: 'sketch', icon: '🎨', label: 'Napkin Whiteboard' },
             { id: 'voice',  icon: '🎙️', label: 'Voice Dictation' },
@@ -191,6 +191,9 @@ export default function InputStage({
               key={tab.id}
               role="tab"
               type="button"
+              id={`tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls={`tabpanel-${tab.id}`}
               className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.id)}
             >
@@ -202,7 +205,7 @@ export default function InputStage({
 
         {/* 1. Whiteboard Canvas Tab */}
         {activeTab === 'sketch' && (
-          <div className="input-body animate-slide-up">
+          <div className="input-body animate-slide-up" role="tabpanel" id="tabpanel-sketch" aria-labelledby="tab-sketch">
             <WhiteboardCanvas
               onExportImage={(b64) => setCanvasBase64(b64)}
               currentUser={currentUser}
@@ -280,7 +283,7 @@ export default function InputStage({
 
         {/* 2. Voice Dictation Tab */}
         {activeTab === 'voice' && (
-          <div className="input-body animate-slide-up">
+          <div className="input-body animate-slide-up" role="tabpanel" id="tabpanel-voice" aria-labelledby="tab-voice">
             <VoiceDictation
               value={ideaText}
               onChange={setIdeaText}
@@ -320,7 +323,7 @@ export default function InputStage({
 
         {/* 3. Text Input Tab */}
         {activeTab === 'text' && (
-          <div className="input-body animate-slide-up">
+          <div className="input-body animate-slide-up" role="tabpanel" id="tabpanel-text" aria-labelledby="tab-text">
             <div className="textarea-top-actions">
               <span className="textarea-hint">Describe your project freely:</span>
               <button
@@ -349,7 +352,7 @@ export default function InputStage({
 
         {/* 4. Image Upload Tab */}
         {activeTab === 'image' && (
-          <div className="input-body animate-slide-up">
+          <div className="input-body animate-slide-up" role="tabpanel" id="tabpanel-image" aria-labelledby="tab-image">
             <div
               className={`dropzone ${isDragging ? 'dropzone--active' : ''} ${imagePreview ? 'dropzone--filled' : ''}`}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -472,7 +475,7 @@ export default function InputStage({
 
         {/* 5. Link Input Tab */}
         {activeTab === 'link' && (
-          <div className="input-body animate-slide-up">
+          <div className="input-body animate-slide-up" role="tabpanel" id="tabpanel-link" aria-labelledby="tab-link">
             <div className="link-input-group">
               <span className="link-icon">🔗</span>
               <input
