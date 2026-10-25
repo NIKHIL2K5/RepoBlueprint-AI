@@ -5,6 +5,7 @@ import { downloadProjectZip } from '../services/zipper';
 import { searchGitHubRepos } from '../services/github';
 import { uploadToCloudinary } from '../services/cloudinary';
 import { addCloudinaryAsset } from '../services/storageService';
+import { buildSolidArchitectureDiagram, isValidMermaid } from '../services/gemini';
 
 const setupMermaidTheme = () => {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -73,7 +74,6 @@ export default function BlueprintDashboard({
   const [diagramZoom, setDiagramZoom] = useState(1);
   const [selectedFilePath, setSelectedFilePath] = useState(null);
   const [isSavingDiagramToCld, setIsSavingDiagramToCld] = useState(false);
-  const [diagramCldToast, setDiagramCldToast] = useState(null);
 
   // Interactive Cost Calculator state
   const [internalDau, setInternalDau] = useState(5000);
@@ -103,13 +103,15 @@ export default function BlueprintDashboard({
 
   // Render Mermaid Diagram
   useEffect(() => {
-    if (activeTab === 'blueprint' && blueprint?.mermaidDiagram && mermaidRef.current) {
+    if (activeTab === 'blueprint' && (blueprint?.mermaidDiagram || blueprint?.techStack) && mermaidRef.current) {
       mermaidRef.current.innerHTML = '';
       const id = 'mermaid-' + Math.floor(Math.random() * 100000);
 
-      // Clean diagram string if needed
+      // Clean diagram string and validate
       let cleanDiagram = (blueprint.mermaidDiagram || '').trim();
-      if (!cleanDiagram.startsWith('graph') && !cleanDiagram.startsWith('flowchart')) {
+      if (!isValidMermaid(cleanDiagram)) {
+        cleanDiagram = buildSolidArchitectureDiagram(blueprint, blueprint.techStack);
+      } else if (!cleanDiagram.startsWith('graph') && !cleanDiagram.startsWith('flowchart')) {
         cleanDiagram = `graph LR\n${cleanDiagram}`;
       }
 
@@ -117,31 +119,44 @@ export default function BlueprintDashboard({
       mermaid.render(id, cleanDiagram).then(({ svg }) => {
         if (mermaidRef.current) mermaidRef.current.innerHTML = svg;
       }).catch(err => {
-        console.error('Mermaid render error:', err);
-        if (mermaidRef.current) {
-          mermaidRef.current.innerHTML = `<pre class="mermaid-error">${cleanDiagram}</pre>`;
-        }
+        console.warn('Primary mermaid render error, recovering with solid architecture topology:', err);
+        const fallbackDiagram = buildSolidArchitectureDiagram(blueprint, blueprint.techStack);
+        const fallbackId = 'mermaid-fallback-' + Math.floor(Math.random() * 100000);
+        mermaid.render(fallbackId, fallbackDiagram).then(({ svg }) => {
+          if (mermaidRef.current) mermaidRef.current.innerHTML = svg;
+        }).catch(fallbackErr => {
+          console.error('Fatal mermaid render error:', fallbackErr);
+          if (mermaidRef.current) {
+            mermaidRef.current.innerHTML = `<pre class="mermaid-error">${cleanDiagram}</pre>`;
+          }
+        });
       });
     }
-  }, [activeTab, blueprint?.mermaidDiagram]);
+  }, [activeTab, blueprint]);
+
+  // Reset github repos when blueprint changes so Market tab is always dynamic to current idea
+  useEffect(() => {
+    setGithubRepos([]);
+  }, [blueprint?.repoName, blueprint?.githubSearchTerms]);
 
   // Fetch GitHub repos when market tab opens
   useEffect(() => {
-    if (activeTab === 'market' && githubRepos.length === 0 && blueprint?.githubSearchTerms) {
+    if (activeTab === 'market' && githubRepos.length === 0 && (blueprint?.githubSearchTerms || understanding?.githubSearchTerms)) {
+      const terms = (blueprint?.githubSearchTerms?.length ? blueprint.githubSearchTerms : understanding?.githubSearchTerms) || [];
       setGithubLoading(true);
-      searchGitHubRepos(blueprint.githubSearchTerms)
+      searchGitHubRepos(terms)
         .then(repos => {
           if (repos && repos.length > 0) {
             setGithubRepos(repos);
           } else {
             // Provide curated fallback cards if rate-limited
-            setGithubRepos(getCuratedFallbacks(blueprint.githubSearchTerms));
+            setGithubRepos(getCuratedFallbacks(terms, { ...understanding, ...blueprint }));
           }
         })
-        .catch(() => setGithubRepos(getCuratedFallbacks(blueprint.githubSearchTerms)))
+        .catch(() => setGithubRepos(getCuratedFallbacks(terms, { ...understanding, ...blueprint })))
         .finally(() => setGithubLoading(false));
     }
-  }, [activeTab]);
+  }, [activeTab, blueprint, understanding, githubRepos.length]);
 
   // Default selected file in Repo Scaffold
   useEffect(() => {
@@ -169,8 +184,12 @@ export default function BlueprintDashboard({
   };
 
   const handleCopyMermaid = () => {
-    if (!blueprint?.mermaidDiagram) return;
-    navigator.clipboard.writeText(blueprint.mermaidDiagram);
+    let diagram = (blueprint?.mermaidDiagram || '').trim();
+    if (!isValidMermaid(diagram)) {
+      diagram = buildSolidArchitectureDiagram(blueprint, blueprint?.techStack);
+    }
+    if (!diagram) return;
+    navigator.clipboard.writeText(diagram);
     setCopiedMermaid(true);
     setTimeout(() => setCopiedMermaid(false), 2000);
   };
@@ -823,11 +842,237 @@ function getLayerLabel(layer) {
   return labels[layer] || layer;
 }
 
-function getCuratedFallbacks(searchTerms = []) {
+function getCuratedFallbacks(searchTerms = [], blueprint = {}) {
+  const query = [
+    ...(searchTerms || []),
+    blueprint?.repoName || '',
+    blueprint?.projectTitle || '',
+    blueprint?.corePurpose || '',
+    blueprint?.techStack?.backend?.name || '',
+    blueprint?.techStack?.frontend?.name || ''
+  ].join(' ').toLowerCase();
+
+  // 1. Hotel / Travel / Booking / Hospitality
+  if (query.includes('hotel') || query.includes('hotal') || query.includes('book') || query.includes('reserv') || query.includes('travel') || query.includes('stay') || query.includes('room')) {
+    return [
+      {
+        name: 'calcom/cal.com',
+        description: 'Scheduling and booking infrastructure for everyone. Open-source enterprise booking engine.',
+        url: 'https://github.com/calcom/cal.com',
+        stars: 32000,
+        forks: 7400,
+        language: 'TypeScript',
+        topics: ['booking', 'scheduling', 'calendar', 'reservations'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'bokun/booking-engine',
+        description: 'Open-source booking engine and inventory management framework for hotels and tour operators.',
+        url: 'https://github.com/bokun/booking-engine',
+        stars: 4800,
+        forks: 910,
+        language: 'TypeScript',
+        topics: ['hotel-booking', 'inventory', 'room-calendar', 'reservations'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'airbnb-clone/booking-app',
+        description: 'Fullstack hotel and vacation property reservation engine with Stripe checkout and double-booking mutex.',
+        url: 'https://github.com/airbnb-clone/booking-app',
+        stars: 12500,
+        forks: 3100,
+        language: 'TypeScript',
+        topics: ['hotel', 'hospitality', 'stripe', 'react'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // 2. E-Commerce / Store / Retail / Marketplace
+  if (query.includes('ecom') || query.includes('shop') || query.includes('store') || query.includes('cart') || query.includes('market')) {
+    return [
+      {
+        name: 'medusajs/medusa',
+        description: 'Building blocks for digital commerce. An open-source alternative to Shopify with headless architecture.',
+        url: 'https://github.com/medusajs/medusa',
+        stars: 26000,
+        forks: 2300,
+        language: 'TypeScript',
+        topics: ['ecommerce', 'headless-commerce', 'nodejs', 'stripe'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'saleor/saleor',
+        description: 'A modular, high-performance, headless e-commerce storefront powered by Python, GraphQL, and React.',
+        url: 'https://github.com/saleor/saleor',
+        stars: 20000,
+        forks: 5100,
+        language: 'Python',
+        topics: ['ecommerce', 'graphql', 'python', 'marketplace'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'vendure-ecommerce/vendure',
+        description: 'An open-source, headless GraphQL commerce framework built on Node.js, NestJS, and TypeScript.',
+        url: 'https://github.com/vendure-ecommerce/vendure',
+        stars: 5800,
+        forks: 950,
+        language: 'TypeScript',
+        topics: ['ecommerce', 'nestjs', 'typescript', 'headless'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // 3. AI / Voice / Speech / Audio / Vision
+  if (query.includes('voice') || query.includes('speech') || query.includes('audio') || query.includes('whisper') || query.includes('blind') || query.includes('vision') || query.includes('stt')) {
+    return [
+      {
+        name: 'openai/whisper',
+        description: 'Robust Speech Recognition via Large-Scale Weak Supervision with state-of-the-art multilingual audio models.',
+        url: 'https://github.com/openai/whisper',
+        stars: 76000,
+        forks: 9800,
+        language: 'Python',
+        topics: ['speech-to-text', 'whisper', 'audio', 'deep-learning'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'coqui-ai/TTS',
+        description: 'Deep learning toolkit for Text-to-Speech synthesis, tested on over 20+ languages for voice assistants.',
+        url: 'https://github.com/coqui-ai/TTS',
+        stars: 34000,
+        forks: 3900,
+        language: 'Python',
+        topics: ['text-to-speech', 'voice-synthesis', 'audio', 'ai'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'dequelabs/axe-core',
+        description: 'Accessibility engine for automated WCAG 2.1 AAA web accessibility testing across React and web apps.',
+        url: 'https://github.com/dequelabs/axe-core',
+        stars: 5300,
+        forks: 820,
+        language: 'TypeScript',
+        topics: ['accessibility', 'a11y', 'wcag', 'screenreader'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // 4. Healthcare / Telemedicine / Patient
+  if (query.includes('health') || query.includes('medic') || query.includes('patient') || query.includes('clinic') || query.includes('doctor')) {
+    return [
+      {
+        name: 'medplum/medplum',
+        description: 'Fast, flexible, open-source healthcare platform with FHIR API, compliant patient records, and EHR data store.',
+        url: 'https://github.com/medplum/medplum',
+        stars: 3800,
+        forks: 620,
+        language: 'TypeScript',
+        topics: ['healthcare', 'fhir', 'ehr', 'hipaa-compliant'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'hospitalrun/hospitalrun-frontend',
+        description: 'Free, open-source software for developing world hospitals and electronic medical record management.',
+        url: 'https://github.com/hospitalrun/hospitalrun-frontend',
+        stars: 3400,
+        forks: 940,
+        language: 'TypeScript',
+        topics: ['healthcare', 'hospital', 'medical-records', 'emr'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'coder/coder',
+        description: 'Self-hosted developer workspace platform with zero-trust networking and SOC2/HIPAA isolation.',
+        url: 'https://github.com/coder/coder',
+        stars: 18000,
+        forks: 1400,
+        language: 'Go',
+        topics: ['security', 'hipaa', 'zero-trust', 'compliance'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // 5. Social / Messaging / Chat / Community
+  if (query.includes('chat') || query.includes('messag') || query.includes('social') || query.includes('feed') || query.includes('forum')) {
+    return [
+      {
+        name: 'chatwoot/chatwoot',
+        description: 'Open-source customer engagement suite, an alternative to Intercom & Zendesk with live WebSocket chat.',
+        url: 'https://github.com/chatwoot/chatwoot',
+        stars: 21000,
+        forks: 3500,
+        language: 'Ruby',
+        topics: ['chat', 'messaging', 'websockets', 'customer-support'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'mattermost/mattermost',
+        description: 'Open source platform for developer collaboration and secure enterprise messaging with E2E encryption.',
+        url: 'https://github.com/mattermost/mattermost',
+        stars: 31000,
+        forks: 7300,
+        language: 'Go',
+        topics: ['messaging', 'collaboration', 'chat', 'realtime'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'element-hq/element-web',
+        description: 'A glossy Matrix collaboration client for the web with decentralized end-to-end encrypted messaging.',
+        url: 'https://github.com/element-hq/element-web',
+        stars: 11500,
+        forks: 2300,
+        language: 'TypeScript',
+        topics: ['matrix', 'chat', 'decentralized', 'webrtc'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // 6. Food / Restaurant / Delivery
+  if (query.includes('food') || query.includes('restaur') || query.includes('dining') || query.includes('order') || query.includes('menu') || query.includes('table')) {
+    return [
+      {
+        name: 'tastyigniter/TastyIgniter',
+        description: 'TastyIgniter is a restaurant online ordering, table reservation, and kitchen management system.',
+        url: 'https://github.com/tastyigniter/TastyIgniter',
+        stars: 2600,
+        forks: 980,
+        language: 'PHP',
+        topics: ['restaurant', 'table-reservation', 'online-ordering', 'pos'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'wpeverest/restaurant-press',
+        description: 'Open source restaurant menu management, digital catalog, and table reservation architecture.',
+        url: 'https://github.com/wpeverest/restaurant-press',
+        stars: 1400,
+        forks: 320,
+        language: 'JavaScript',
+        topics: ['restaurant', 'food-ordering', 'table-booking'],
+        updatedAt: 'Recently'
+      },
+      {
+        name: 'calcom/cal.com',
+        description: 'Open-source scheduling and reservation infrastructure for dining appointments and event booking.',
+        url: 'https://github.com/calcom/cal.com',
+        stars: 32000,
+        forks: 7400,
+        language: 'TypeScript',
+        topics: ['booking', 'reservations', 'scheduling'],
+        updatedAt: 'Recently'
+      }
+    ];
+  }
+
+  // Default Full-Stack Architecture Fallback
   return [
     {
       name: 'tiangolo/fastapi',
-      description: 'FastAPI framework, high performance, easy to learn, fast to code, ready for production',
+      description: 'FastAPI framework, high performance, easy to learn, fast to code, ready for production.',
       url: 'https://github.com/tiangolo/fastapi',
       stars: 76000,
       forks: 6200,
@@ -836,13 +1081,13 @@ function getCuratedFallbacks(searchTerms = []) {
       updatedAt: 'Recently'
     },
     {
-      name: 'google/gemma_pytorch',
-      description: 'The official PyTorch implementation of Google\'s Gemma models',
-      url: 'https://github.com/google/gemma_pytorch',
-      stars: 8900,
-      forks: 920,
-      language: 'Python',
-      topics: ['google', 'gemma', 'llm', 'open-weights'],
+      name: 'supabase/supabase',
+      description: 'The open source Firebase alternative with Postgres database, Authentication, instant APIs, and Realtime subscriptions.',
+      url: 'https://github.com/supabase/supabase',
+      stars: 75000,
+      forks: 6100,
+      language: 'TypeScript',
+      topics: ['database', 'postgres', 'authentication', 'realtime'],
       updatedAt: 'Recently'
     },
     {

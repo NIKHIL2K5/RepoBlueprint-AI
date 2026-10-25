@@ -559,7 +559,6 @@ export default function App() {
   };
 
   const isLoading = appState === STATE.LOAD1 || appState === STATE.LOAD2;
-  const showSidebar = appState !== STATE.SETUP && !isLoading;
 
   // Live context payload for Copilot
   const copilotAppContext = {

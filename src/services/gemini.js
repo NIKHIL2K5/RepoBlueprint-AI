@@ -19,71 +19,103 @@ export async function understandIdea(config, ideaText, imageBase64 = null, mimeT
   }
 
   const systemPrompt = `You are an elite AI Technical Co-Founder and Principal Software Architect.
-Analyze the user's project idea (which may come as raw text, structured thoughts, or a hand-drawn napkin sketch/diagram).
-Respond with ONLY a valid, parseable JSON object — absolutely NO markdown code fences, NO backticks, NO text before or after.
+Analyze the user's project idea: "${ideaText || 'Whiteboard architectural sketch'}"
+Respond with ONLY a valid, parseable JSON object — absolutely NO markdown code fences, NO backticks, NO commentary.
+
+CRITICAL REQUIREMENTS:
+1. "projectTitle": A memorable, professional 2-4 word startup/platform title (e.g. "StaySphere · Hotel Reservation Engine"). NEVER use raw conversational text or repeat "I need to create" or user typos.
+2. "oneLiner": A 1-sentence high-impact architectural summary of what this platform accomplishes.
+3. "corePurpose": 2-3 clear technical sentences explaining the real-world problem and technical architecture.
+4. "clarifyingQuestions": MUST BE 3 deep, domain-specific technical architectural questions specifically for "${ideaText}" (e.g. for booking: double-booking prevention, payment escrow, calendar search). Each question MUST have "question", "why", and 3 concrete "options". NEVER return generic database/auth questions.
+5. "githubSearchTerms": 3-4 clean, searchable topic keywords (e.g. for hotel: ["hotel-booking", "hotel-reservation", "booking-system"]). NEVER output full sentences or user phrases.
+6. "similarWebsites": 2-3 real commercial SaaS products in this exact space with their URLs and our competitive moat.
+7. "openSourceProjects": 2-3 real GitHub repositories in this exact space with owner/repo and descriptions.
 
 Required JSON schema:
 {
-  "projectTitle": "Concise catchy project title",
+  "projectTitle": "Polished Brand Name",
   "oneLiner": "One-sentence high-impact pitch",
-  "corePurpose": "2-3 clear sentences explaining the real-world problem and technical solution",
-  "keyActors": ["User Role 1", "External System 2", "Admin / Worker 3"],
+  "corePurpose": "2-3 clear sentences explaining the problem and technical solution",
+  "keyActors": ["Actor 1", "Actor 2", "Actor 3"],
   "coreWorkflow": "Step-by-step main flow: Input → Processing → Output / Feedback",
   "identifiedComponents": [
-    { "name": "ComponentName", "role": "What it does specifically", "type": "frontend|backend|database|ai|cache|external-api|other" }
+    { "name": "ComponentName", "role": "Specific role", "type": "frontend|backend|database|ai|cache|external-api|other" }
   ],
   "dataFlows": [
     { "from": "Component A", "to": "Component B", "description": "Protocol and data transferred" }
   ],
   "prosAndCons": {
     "pros": [
-      { "title": "Advantage Title", "detail": "Detailed architectural or competitive advantage", "badge": "Performance|Security|Scalability|Cost" }
+      { "title": "Advantage Title", "detail": "Detailed advantage", "badge": "Performance|Security|Scalability|Cost" }
     ],
     "cons": [
-      { "title": "Trade-off Title", "detail": "Detailed technical constraint or bottleneck", "mitigation": "Recommended engineering mitigation", "badge": "Latency|Compliance|Network|Complexity" }
+      { "title": "Bottleneck Title", "detail": "Detailed challenge", "mitigation": "Mitigation", "badge": "Latency|Compliance|Network|Complexity" }
     ]
   },
   "similarWebsites": [
-    { "name": "Product Name", "url": "https://...", "category": "Market Leader / Commercial SaaS", "description": "What they do", "moat": "Why your idea has an unfair competitive edge" }
+    { "name": "Product Name", "url": "https://...", "category": "Market Leader / Commercial SaaS", "description": "What they do", "moat": "Our unfair competitive edge" }
   ],
   "openSourceProjects": [
-    { "name": "Repo Name", "repo": "owner/repo", "url": "https://github.com/owner/repo", "stars": "⭐ Xk", "techStack": "Tech used", "description": "What this open-source project provides" }
+    { "name": "Repo Name", "repo": "owner/repo", "url": "https://github.com/owner/repo", "stars": "⭐ Xk", "techStack": "Tech used", "description": "What this provides" }
   ],
-  "githubSearchTerms": ["term1", "term2", "term3"],
+  "githubSearchTerms": ["term-1", "term-2", "term-3"],
   "clarifyingQuestions": [
-    { "question": "Question text", "why": "Why this architectural decision matters", "options": ["Option A", "Option B", "Option C"] }
+    { "question": "Domain question text", "why": "Why this architectural decision matters", "options": ["Option A", "Option B", "Option C"] }
   ],
   "innovationSuggestions": [
-    { "title": "Feature Name", "description": "How it gives the project an unfair advantage", "complexity": "Low|Medium|High" }
+    { "title": "Feature Name", "description": "How it gives unfair advantage", "complexity": "Low|Medium|High" }
   ],
   "assumptions": ["Assumption 1", "Assumption 2"]
-}
-
-Generate 3-4 smart clarifying questions, 3 innovative suggestions, 3-4 concrete pros/cons with mitigations, and 2-3 real similar websites & open source projects. Be technically precise and creative.`;
+}`;
 
   try {
     let result = null;
     if (config?.provider === 'gemini') {
       result = await Promise.race([
         callGemini(config.geminiKey, config.geminiModel, systemPrompt, ideaText, imageBase64, mimeType),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 20000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 22000))
       ]);
     } else {
       result = await Promise.race([
         callOllama(config?.ollamaUrl, config?.ollamaModel, systemPrompt, ideaText),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 45000))
       ]);
     }
 
     if (result && result.projectTitle) {
-      const enriched = synthesizeProsAndConsAndCompetitors(ideaText, result.projectTitle, result.corePurpose);
+      const smartIdentity = extractSmartProjectIdentity(ideaText);
+      const isBadTitle = !result.projectTitle ||
+        result.projectTitle.toLowerCase().includes('i need') ||
+        result.projectTitle.toLowerCase().includes('create hotal') ||
+        result.projectTitle.toLowerCase().includes('my idea') ||
+        result.projectTitle.length < 4;
+
+      const cleanTitle = isBadTitle ? smartIdentity.projectTitle : result.projectTitle;
+      const cleanOneLiner = (!result.oneLiner || result.oneLiner.toLowerCase().includes('i need to create a hotal')) ? smartIdentity.oneLiner : result.oneLiner;
+      const cleanPurpose = (!result.corePurpose || result.corePurpose.toLowerCase().includes('i need to create a hotal')) ? smartIdentity.corePurpose : result.corePurpose;
+
+      const domain = smartIdentity.domain;
+      const isGenericQuestions = !result.clarifyingQuestions?.length ||
+        result.clarifyingQuestions.some(q => q.question?.toLowerCase().includes('which primary database engine fits your transaction'));
+
+      const cleanQuestions = isGenericQuestions
+        ? generateDomainClarifyingQuestions(ideaText, domain)
+        : result.clarifyingQuestions;
+
+      const enriched = synthesizeProsAndConsAndCompetitors(ideaText, cleanTitle, cleanPurpose);
       return {
         ...enriched,
         ...result,
+        projectTitle: cleanTitle,
+        oneLiner: cleanOneLiner,
+        corePurpose: cleanPurpose,
+        clarifyingQuestions: cleanQuestions,
         prosAndCons: result.prosAndCons || enriched.prosAndCons,
         similarWebsites: result.similarWebsites || enriched.similarWebsites,
         openSourceProjects: result.openSourceProjects || enriched.openSourceProjects,
-        githubSearchTerms: result.githubSearchTerms || enriched.githubSearchTerms,
+        githubSearchTerms: (result.githubSearchTerms?.length && !result.githubSearchTerms.some(t => t.includes('i-need') || t.includes('create-')))
+          ? result.githubSearchTerms
+          : enriched.githubSearchTerms,
       };
     }
     return synthesizeSmartUnderstanding(ideaText);
@@ -91,6 +123,77 @@ Generate 3-4 smart clarifying questions, 3 innovative suggestions, 3-4 concrete 
     console.warn('[understandIdea]: Engine call failed or timed out, synthesizing smart architecture:', err.message);
     return synthesizeSmartUnderstanding(ideaText);
   }
+}
+
+export function isValidMermaid(diagram) {
+  if (!diagram || typeof diagram !== 'string') return false;
+  const trimmed = diagram.trim();
+  if (!trimmed.startsWith('graph') && !trimmed.startsWith('flowchart')) return false;
+  // Disqualify hallucinated pseudocode like 'style = rounded'
+  if (trimmed.includes('style =') || trimmed.includes('style=')) return false;
+  if (/-->\s*[^"\n\[\(]+\s*\|/i.test(trimmed)) return false;
+  if (!trimmed.includes('-->') && !trimmed.includes('---')) return false;
+  if (!trimmed.includes('subgraph')) return false;
+  return true;
+}
+
+export function buildSolidArchitectureDiagram(understanding = {}, techStack = {}) {
+  const ts = techStack || understanding?.techStack || {};
+  const frontend = ts?.frontend?.name || 'React 19 + Vite + Tailwind';
+  const backend = ts?.backend?.name || 'FastAPI / Node.js';
+  const database = ts?.database?.name || 'PostgreSQL (Primary ACID)';
+  const cache = (ts?.extras || []).find(e => e.name?.toLowerCase().includes('redis') || e.name?.toLowerCase().includes('cache'))?.name || 'Redis Cache (Sessions & Queue)';
+  const ai = ts?.ai?.name || 'Gemini / Gemma Engine (Inference & Vision)';
+  const worker = (ts?.extras || []).find(e => e.name?.toLowerCase().includes('celery') || e.name?.toLowerCase().includes('worker') || e.name?.toLowerCase().includes('bullmq'))?.name || 'Background Worker (Celery / BullMQ)';
+  const auth = (ts?.extras || []).find(e => e.name?.toLowerCase().includes('auth') || e.name?.toLowerCase().includes('jwt'))?.name || 'Auth & Security (OAuth2 + JWT)';
+
+  const clean = (str, maxLen = 42) => {
+    let s = (str || '').replace(/["`\r\n]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (s.length > maxLen) s = s.slice(0, maxLen - 2) + '..';
+    return s;
+  };
+
+  const isMobile = frontend.toLowerCase().includes('mobile') || frontend.toLowerCase().includes('react native') || frontend.toLowerCase().includes('flutter');
+  const clientIcon = isMobile ? '📱' : '💻';
+  const clientLabel = isMobile ? 'Mobile App Client' : 'Web / Mobile UI';
+
+  return `graph LR
+  subgraph ClientTier["Client Tier"]
+    UI["${clientIcon} ${clientLabel}<br/>(${clean(frontend)})"]
+  end
+
+  subgraph GatewayTier["Gateway & Services"]
+    API["⚡ API Gateway<br/>(${clean(backend)})"]
+    AUTH["🛡️ ${clean(auth)}"]
+    WORKER["⚙️ ${clean(worker)}"]
+  end
+
+  subgraph StorageTier["Data & Storage"]
+    CACHE[("⚡ ${clean(cache)}")]
+    DB[("🗄️ ${clean(database)}")]
+  end
+
+  subgraph AITier["AI Engine"]
+    AI["🧠 ${clean(ai)}"]
+  end
+
+  UI -->|HTTPS / WSS| API
+  API --> AUTH
+  API -->|Fast Cache| CACHE
+  API -->|Read/Write| DB
+  API -->|Async Tasks| WORKER
+  WORKER --> DB
+  API -->|REST API| AI
+
+  classDef client fill:#00c8ff15,stroke:#00c8ff,stroke-width:2px;
+  classDef gateway fill:#8b5cf615,stroke:#8b5cf6,stroke-width:2px;
+  classDef storage fill:#f59e0b15,stroke:#f59e0b,stroke-width:2px;
+  classDef ai fill:#10b98115,stroke:#10b981,stroke-width:2px;
+
+  class UI client;
+  class API,AUTH,WORKER gateway;
+  class CACHE,DB storage;
+  class AI ai;`;
 }
 
 /* ──────────────── PHASE 2: Generate Master Blueprint ──────────────── */
@@ -111,7 +214,7 @@ Generate the complete Master Architecture Blueprint. Respond with ONLY a valid, 
 
 Required JSON schema:
 {
-  "mermaidDiagram": "Valid Mermaid.js graph LR diagram code. Use proper Mermaid syntax with subgraphs and styling.",
+  "mermaidDiagram": "STRICT VALID Mermaid.js graph LR diagram with subgraphs and classDef styling. EXACT TEMPLATE: graph LR \\n subgraph ClientTier[\\\"Client Tier\\\"] \\n UI[\\\"💻 Web / Mobile UI<br/>(React 19 + Vite + Tailwind)\\\"] \\n end \\n subgraph GatewayTier[\\\"Gateway & Services\\\"] \\n API[\\\"⚡ API Gateway<br/>(FastAPI / Node.js)\\\"] \\n AUTH[\\\"🛡️ Auth & Security<br/>(OAuth2 + JWT)\\\"] \\n WORKER[\\\"⚙️ Background Worker<br/>(Celery / BullMQ)\\\"] \\n end \\n subgraph StorageTier[\\\"Data & Storage\\\"] \\n CACHE[(\\\"⚡ Redis Cache<br/>(Sessions & Queue)\\\")] \\n DB[(\\\"🗄️ PostgreSQL<br/>(Primary ACID)\\\")] \\n end \\n subgraph AITier[\\\"AI Engine\\\"] \\n AI[\\\"🧠 Gemini / Gemma Engine<br/>(Inference & Vision)\\\"] \\n end \\n UI -->|HTTPS / WSS| API \\n API --> AUTH \\n API -->|Fast Cache| CACHE \\n API -->|Read/Write| DB \\n API -->|Async Tasks| WORKER \\n WORKER --> DB \\n API -->|REST API| AI \\n classDef client fill:#00c8ff15,stroke:#00c8ff,stroke-width:2px; \\n classDef gateway fill:#8b5cf615,stroke:#8b5cf6,stroke-width:2px; \\n classDef storage fill:#f59e0b15,stroke:#f59e0b,stroke-width:2px; \\n classDef ai fill:#10b98115,stroke:#10b981,stroke-width:2px; \\n class UI client; \\n class API,AUTH,WORKER gateway; \\n class CACHE,DB storage; \\n class AI ai; DO NOT use 'style = rounded', 'style = filled', or raw labels without node IDs.",
   "fileTree": [
     { "path": "relative/path/filename.ext", "type": "file|dir", "content": "full real code string or null for dir", "description": "purpose of this file" }
   ],
@@ -176,11 +279,20 @@ Required JSON schema:
     } else {
       result = await Promise.race([
         callOllama(config?.ollamaUrl, config?.ollamaModel, prompt, ''),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 24000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 45000))
       ]);
     }
 
-    if (result && result.mermaidDiagram && result.fileTree) {
+    if (result && result.fileTree) {
+      if (!isValidMermaid(result.mermaidDiagram)) {
+        console.warn('[generateMasterBlueprint]: Model generated invalid Mermaid diagram syntax. Applying solid architecture diagram:');
+        result.mermaidDiagram = buildSolidArchitectureDiagram(understanding, result.techStack);
+      }
+      if (!result.githubSearchTerms || result.githubSearchTerms.length === 0 || result.githubSearchTerms.some(t => t.includes('term1') || t.includes('project-slug') || t.includes('i-need-create-'))) {
+        result.githubSearchTerms = understanding?.githubSearchTerms?.length
+          ? understanding.githubSearchTerms
+          : synthesizeProsAndConsAndCompetitors(understanding?.rawPrompt || understanding?.projectTitle || '', understanding?.projectTitle || '', understanding?.corePurpose || '')?.githubSearchTerms || ['fastapi-react', 'docker-compose'];
+      }
       return result;
     }
     return synthesizeSmartBlueprint(understanding, userRefinements);
@@ -284,9 +396,9 @@ async function callOllama(baseUrl, model, systemPrompt, userText) {
       prompt: fullPrompt,
       format: 'json',
       stream: false,
-      options: { temperature: 0.4, num_predict: 800 } // Tuned for local CPU generation!
+      options: { temperature: 0.3, num_predict: 1400, top_p: 0.9 }
     }),
-    signal: AbortSignal.timeout(30000)
+    signal: AbortSignal.timeout(45000)
   });
 
   if (!response.ok) {
@@ -318,11 +430,607 @@ async function handleDemoBlueprint(understanding) {
   return synthesizeSmartBlueprint(understanding);
 }
 
+/* ──────────────── DOMAIN CLASSIFIER & IDENTITY EXTRACTOR ──────────────── */
+export function detectProjectDomain(rawText = '') {
+  const t = String(rawText || '').toLowerCase();
+  if (t.includes('hotel') || t.includes('hotal') || t.includes('booking') || t.includes('reserv') || t.includes('travel') || t.includes('stay') || t.includes('room') || t.includes('airbnb') || t.includes('hostel') || t.includes('flight')) {
+    return 'hotel';
+  }
+  if (t.includes('ecom') || t.includes('shop') || t.includes('store') || t.includes('cart') || t.includes('checkout') || t.includes('market') || t.includes('retail') || t.includes('product') || t.includes('catalog')) {
+    return 'ecommerce';
+  }
+  if (t.includes('restaurant') || t.includes('restraunt') || t.includes('food') || t.includes('dining') || t.includes('dish') || t.includes('cafe') || t.includes('menu') || t.includes('kitchen') || t.includes('order') || t.includes('table')) {
+    return 'restaurant';
+  }
+  if (t.includes('health') || t.includes('medic') || t.includes('patient') || t.includes('clinic') || t.includes('doctor') || t.includes('telemed') || t.includes('hospital') || t.includes('ehr') || t.includes('pharma')) {
+    return 'healthcare';
+  }
+  if (t.includes('fintech') || t.includes('finance') || t.includes('bank') || t.includes('payment') || t.includes('wallet') || t.includes('crypto') || t.includes('invoice') || t.includes('ledger') || t.includes('trading')) {
+    return 'fintech';
+  }
+  if (t.includes('chat') || t.includes('messag') || t.includes('social') || t.includes('feed') || t.includes('forum') || t.includes('community') || t.includes('network') || t.includes('connect')) {
+    return 'social';
+  }
+  if (t.includes('blind') || t.includes('visually impaired') || t.includes('accessib') || t.includes('screen reader') || t.includes('a11y') || t.includes('wcag')) {
+    return 'a11y';
+  }
+  if (t.includes('voice') || t.includes('speech') || t.includes('audio') || t.includes('whisper') || t.includes('dictat') || t.includes('stt') || t.includes('tts')) {
+    return 'voice';
+  }
+  if (t.includes('id') || t.includes('card') || t.includes('identity') || t.includes('ocr') || t.includes('kyc') || t.includes('badge') || t.includes('passport')) {
+    return 'kyc';
+  }
+  if (t.includes('course') || t.includes('edtech') || t.includes('learn') || t.includes('student') || t.includes('school') || t.includes('quiz') || t.includes('tutor') || t.includes('lms')) {
+    return 'edtech';
+  }
+  if (t.includes('property') || t.includes('real estate') || t.includes('house') || t.includes('rental') || t.includes('apartment') || t.includes('realtor')) {
+    return 'realestate';
+  }
+  if (t.includes('fitness') || t.includes('gym') || t.includes('workout') || t.includes('exercise') || t.includes('habit') || t.includes('wellness')) {
+    return 'fitness';
+  }
+  if (t.includes('devops') || t.includes('cluster') || t.includes('docker') || t.includes('kubernetes') || t.includes('ci/cd') || t.includes('telemetry') || t.includes('monitoring')) {
+    return 'devops';
+  }
+  return 'general';
+}
+
+export function extractSmartProjectIdentity(rawText = '') {
+  let cleaned = String(rawText || '').trim();
+  cleaned = cleaned.replace(/^(i\s+need\s+to\s+create(\s+a)?|i\s+want\s+to\s+build(\s+a)?|i\s+want\s+to\s+create(\s+a)?|my\s+idea\s+is(\s+to)?|i'm\s+making(\s+a)?|can\s+you\s+build(\s+a)?|build(\s+a)?|create(\s+a)?|make(\s+a)?|develop(\s+a)?|system\s+for|application\s+for|app\s+for|website\s+for)\s+/gi, '').trim();
+
+  // Autocorrect common keywords
+  cleaned = cleaned
+    .replace(/\bhotal\b/gi, 'hotel')
+    .replace(/\brestraunt\b/gi, 'restaurant')
+    .replace(/\becommerse\b/gi, 'e-commerce')
+    .replace(/\bmessanger\b/gi, 'messenger')
+    .replace(/\bappication\b/gi, 'application')
+    .replace(/\bacessibility\b/gi, 'accessibility');
+
+  const domain = detectProjectDomain(cleaned || rawText);
+
+  if (domain === 'hotel') {
+    return {
+      domain,
+      projectTitle: 'StaySphere · Hotel & Hospitality Reservation Platform',
+      oneLiner: 'High-concurrency hotel room booking engine with atomic reservation holds, dynamic pricing, and automated guest check-ins.',
+      corePurpose: 'Engineered for hotels, resorts, and vacation properties to manage live room inventories, prevent double-bookings during peak booking windows, process multi-currency payments, and automate guest itineraries.'
+    };
+  }
+
+  if (domain === 'ecommerce') {
+    return {
+      domain,
+      projectTitle: 'VanguardStore · Headless E-Commerce & Marketplace Platform',
+      oneLiner: 'High-performance digital commerce platform with real-time inventory reservation, headless storefronts, and automated order fulfillment.',
+      corePurpose: 'Enables merchants to showcase modular product catalogs, handle high-traffic flash sales with Redis inventory locking, and orchestrate automated payment and shipping webhooks.'
+    };
+  }
+
+  if (domain === 'restaurant') {
+    return {
+      domain,
+      projectTitle: 'BistroFlow · Restaurant Reservation & Kitchen Order Platform',
+      oneLiner: 'Real-time table booking and kitchen order management system with live POS synchronization.',
+      corePurpose: 'Empowers dining establishments to manage table reservations, orchestrate live kitchen display queues, and process contactless table orders seamlessly.'
+    };
+  }
+
+  if (domain === 'healthcare') {
+    return {
+      domain,
+      projectTitle: 'CarePulse · Telehealth Consultation & Patient Management Engine',
+      oneLiner: 'HIPAA-ready clinical consultation suite with end-to-end encrypted WebRTC video, electronic health records, and prescription dispatch.',
+      corePurpose: 'Connects patients with medical practitioners through secure encrypted telemedicine sessions, manages FHIR-compliant health records, and automates clinical scheduling.'
+    };
+  }
+
+  if (domain === 'fintech') {
+    return {
+      domain,
+      projectTitle: 'VaultPay · High-Throughput Financial Ledger & Payments API',
+      oneLiner: 'Double-entry transaction ledger with real-time fraud scoring, webhook idempotency, and automated multi-currency reconciliation.',
+      corePurpose: 'Delivers bank-grade transaction auditing, strict immutable ledger records, real-time risk scoring, and zero-loss payout orchestration.'
+    };
+  }
+
+  if (domain === 'social') {
+    return {
+      domain,
+      projectTitle: 'NexusChat · Real-Time Decentralized Messaging & Community Hub',
+      oneLiner: 'Sub-50ms WebSocket & WebRTC messaging client with end-to-end encryption, presence channels, and rich media streaming.',
+      corePurpose: 'Provides communities with instant messaging channels, low-latency audio/video rooms, rich media asset processing, and spam mitigation shields.'
+    };
+  }
+
+  if (domain === 'voice') {
+    return {
+      domain,
+      projectTitle: 'VoxFlow · Conversational Multilingual Voice Assistant Engine',
+      oneLiner: 'Low-latency speech-to-text and natural audio feedback portal powered by Whisper and streaming neural audio synthesis.',
+      corePurpose: 'Empowers users to navigate interfaces, dictate complex commands, and receive natural voice feedback in real time across 8+ international languages.'
+    };
+  }
+
+  if (domain === 'edtech') {
+    return {
+      domain,
+      projectTitle: 'LearnMatrix · Adaptive Learning Management & Quiz System',
+      oneLiner: 'Interactive modular courseware platform with automated assessment evaluation, progress analytics, and certificate verification.',
+      corePurpose: 'Delivers dynamic learning pathways, interactive exercises with instant automated grading, and granular student achievement tracking.'
+    };
+  }
+
+  if (domain === 'realestate') {
+    return {
+      domain,
+      projectTitle: 'EstateIQ · Property Listing & Virtual Tour Platform',
+      oneLiner: 'Comprehensive real estate discovery engine with geospatial radius filtering, tour scheduling, and tenant verification.',
+      corePurpose: 'Enables property managers, buyers, and tenants to explore listings through interactive maps, schedule viewings, and submit rental applications securely.'
+    };
+  }
+
+  if (domain === 'fitness') {
+    return {
+      domain,
+      projectTitle: 'FitPulse · Adaptive Workout & Wellness Coaching Copilot',
+      oneLiner: 'AI-guided workout planner and health tracker with predictive behavioral nudges and progressive overload analytics.',
+      corePurpose: 'Constructs personalized training schedules, monitors physiological metrics, and delivers dynamic coaching interventions based on recovery trends.'
+    };
+  }
+
+  if (domain === 'devops') {
+    return {
+      domain,
+      projectTitle: 'DevOps Multi-Cluster Wizard',
+      oneLiner: 'Zero-downtime infrastructure orchestration and container topology manager.',
+      corePurpose: 'Automates Kubernetes cluster deployments, synchronizes secret management, and monitors telemetry across hybrid clouds.'
+    };
+  }
+
+  // Fallback for custom / unique domains
+  const stopWords = new Set(['i', 'need', 'to', 'create', 'a', 'an', 'the', 'for', 'and', 'with', 'in', 'on', 'at', 'by', 'this', 'that', 'my', 'we', 'our', 'app', 'application', 'system', 'website', 'platform', 'tool']);
+  const words = cleaned.split(/\s+/).filter(w => !stopWords.has(w.toLowerCase())).slice(0, 3);
+  const mainWords = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  const brandTitle = mainWords ? `${mainWords} · CloudScale Architecture` : 'CloudScale Architecture';
+
+  return {
+    domain: 'general',
+    projectTitle: brandTitle,
+    oneLiner: `High-impact production architecture for ${cleaned.slice(0, 60)} with modular microservices and automated cloud scaling.`,
+    corePurpose: `Engineered to deliver high throughput, low latency, and production reliability for ${cleaned}.`
+  };
+}
+
+export function generateDomainClarifyingQuestions(ideaText = '', domain = 'general') {
+  if (domain === 'hotel') {
+    return [
+      {
+        question: 'How should room inventory & double-booking prevention be enforced?',
+        why: 'Directly dictates data consistency during high-traffic simultaneous reservations.',
+        options: [
+          'Redis Distributed Mutex Locks (Sub-millisecond atomic hold with 10-min checkout TTL)',
+          'PostgreSQL Row-Level Locks with SERIALIZABLE isolation (Strict ACID compliance)',
+          'Event-Sourced Reservation Saga (Compensating transactions for multi-property chains)'
+        ]
+      },
+      {
+        question: 'Which payment processing & host payout strategy fits your platform?',
+        why: 'Determines financial compliance, merchant fees, chargeback liability, and refund flows.',
+        options: [
+          'Stripe Connect for Marketplace (Direct split payouts between hotel owner and platform)',
+          'Hosted Checkout with Escrow (Funds held securely until guest check-in date)',
+          'Omnichannel Gateway with 3D Secure (Razorpay, PayPal, Apple Pay with fraud shield)'
+        ]
+      },
+      {
+        question: 'What search, date availability, and geospatial indexing engine is required?',
+        why: 'Dictates search query latency when filtering thousands of hotels across dynamic dates.',
+        options: [
+          'Elasticsearch / Meilisearch (Instant geo-radius search, amenity facets, and typo-tolerance)',
+          'PostgreSQL PostGIS + GiST date range indexes (Zero external infrastructure overhead)',
+          'Redis Availability Bitmaps (Blazing fast in-memory calendar date-range lookups)'
+        ]
+      }
+    ];
+  }
+
+  if (domain === 'ecommerce') {
+    return [
+      {
+        question: 'How should shopping cart state and flash-sale inventory reservation be maintained?',
+        why: 'Prevents overselling scarce stock while maintaining fast response times for buyers.',
+        options: [
+          'Redis In-Memory Atomic Decrements (Zero latency checkout queue with auto-expiry TTL)',
+          'PostgreSQL Optimistic Locking (Version column verification on checkout submission)',
+          'Hybrid Client-Side Cart with Server-Side Pre-Hold Verification'
+        ]
+      },
+      {
+        question: 'Which payment webhook and automated order fulfillment pipeline is required?',
+        why: 'Ensures zero missed orders and guaranteed delivery notifications.',
+        options: [
+          'Idempotent Asynchronous Webhooks with Celery / BullMQ Retry Queues',
+          'Synchronous Gateway Direct Confirmation with Fallback Reconciliation Cron',
+          'Third-party Merchant Engine (Stripe Checkout / Shopify Storefront API)'
+        ]
+      },
+      {
+        question: 'What catalog search and faceted filtering architecture do you prefer?',
+        why: 'Controls catalog browsing speed and complex multi-attribute filtering scalability.',
+        options: [
+          'Meilisearch / Algolia (Sub-10ms instant search with typo-tolerance and attribute facets)',
+          'PostgreSQL Full-Text Search with GIN Indexes (Simple, relational, zero extra services)',
+          'Elasticsearch Cluster (Enterprise catalog with dynamic price weighting)'
+        ]
+      }
+    ];
+  }
+
+  if (domain === 'healthcare') {
+    return [
+      {
+        question: 'What patient data encryption and regulatory compliance model is required?',
+        why: 'Guarantees strict adherence to HIPAA, GDPR, and international health data standards.',
+        options: [
+          'AES-256 Field-Level Encryption with Hardware Security Module (HSM) Key Management',
+          'Zero-Knowledge Patient Vault (End-to-end encrypted records inaccessible to server admin)',
+          'Standard Cloud PostgreSQL Encryption at Rest (Managed AWS/Supabase HIPAA BAA)'
+        ]
+      },
+      {
+        question: 'Which real-time video consultation architecture fits your clinical consultations?',
+        why: 'Dictates video call latency, bandwidth consumption, and consultation recording compliance.',
+        options: [
+          'Encrypted WebRTC Mesh / SFU (Sub-300ms peer-to-peer clinical consultations)',
+          'Managed Daily.co / Twilio Video API (Zero-maintenance video rooms with clinical recording)',
+          'LiveKit Open-Source WebRTC Server (Self-hosted, compliant video infrastructure)'
+        ]
+      },
+      {
+        question: 'How should medical records and prescription workflows integrate with external systems?',
+        why: 'Controls interoperability with pharmacy networks and Electronic Health Record (EHR) systems.',
+        options: [
+          'HL7 / FHIR Standard REST API (Interoperable with Epic, Cerner, and national registries)',
+          'Custom Proprietary JSON REST Endpoints with OAuth2 Scopes',
+          'Event-Driven Webhook Broker with Audit Trail Ledger'
+        ]
+      }
+    ];
+  }
+
+  if (domain === 'fintech') {
+    return [
+      {
+        question: 'How should financial ledger balance consistency and audit logging be guaranteed?',
+        why: 'Ensures zero financial balance discrepancies and verifiable double-entry accounting.',
+        options: [
+          'Immutable Double-Entry Ledger with PostgreSQL SERIALIZABLE Isolation & Audit Logs',
+          'Event-Sourcing with Kafka / Redpanda (Every transaction recorded as an immutable event)',
+          'Formance Stack / Tigris (Dedicated open-source financial ledger engine)'
+        ]
+      },
+      {
+        question: 'What fraud detection and real-time transaction risk scoring pipeline is required?',
+        why: 'Prevents fraudulent withdrawals, chargebacks, and account takeovers.',
+        options: [
+          'Real-time Machine Learning Anomaly Detection on Transaction Stream via Redis',
+          'Heuristic Rule-Engine with Velocity Checks (Rate limits on rapid transfers)',
+          'Third-party Fraud Shield (Sift / Radar API integration)'
+        ]
+      },
+      {
+        question: 'How should bank API integrations and webhook idempotency be enforced?',
+        why: 'Prevents duplicate charges or transfers during network timeouts or retry loops.',
+        options: [
+          'Strict Idempotency-Key Header with Redis TTL & Transactional Database Unique Constraint',
+          'Plaid / Stripe Financial API Gateway with Webhook Signature Verification',
+          'Two-Phase Commit Protocol for External Banking Payouts'
+        ]
+      }
+    ];
+  }
+
+  if (domain === 'social') {
+    return [
+      {
+        question: 'What real-time transport protocol should power message delivery and presence?',
+        why: 'Determines server memory footprint and connection scalability for concurrent chatters.',
+        options: [
+          'WebSocket Gateway with Redis PubSub / Socket.io (Low-latency bidirectional streaming)',
+          'Server-Sent Events (SSE) for Inbound Messages + HTTPS POST for Outbound',
+          'Matrix Protocol Federation (Decentralized, end-to-end encrypted messaging network)'
+        ]
+      },
+      {
+        question: 'How should media uploads (images, voice notes, video) be processed and cached?',
+        why: 'Prevents server CPU saturation and controls cloud CDN egress bandwidth expenses.',
+        options: [
+          'Direct Browser-to-Cloudinary / S3 Presigned Uploads with Client-Side Image Compression',
+          'Background Worker Processing Queue (Thumbnail generation, video transcoding via FFmpeg)',
+          'Cloudflare Images & Stream (Zero-infrastructure automatic edge transformation)'
+        ]
+      },
+      {
+        question: 'What message history storage and search strategy do you prefer?',
+        why: 'Controls database query speed as user chat logs grow into millions of rows.',
+        options: [
+          'PostgreSQL Partitioned by Channel/Room with Cursor-based Pagination',
+          'Cassandra / ScyllaDB Time-Series Store (Ultra-fast append-only chat history)',
+          'MongoDB Document Collection with Full-Text Indexing'
+        ]
+      }
+    ];
+  }
+
+  if (domain === 'restaurant') {
+    return [
+      {
+        question: 'How should live kitchen display order dispatch and table state be synchronized?',
+        why: 'Ensures kitchen staff receive incoming orders in real time without screen refreshes.',
+        options: [
+          'Real-time WebSocket Kitchen Display System (KDS) with Audio Chime Alerts',
+          'Server-Sent Events (SSE) with Auto-reconnecting Table Status Stream',
+          'Polling Fallback with Redis In-Memory Order Cache'
+        ]
+      },
+      {
+        question: 'What menu customization and ingredient inventory tracking model is required?',
+        why: 'Dictates whether the app tracks raw ingredient stock or simple dish availability.',
+        options: [
+          'Item-Level Availability Toggles (Fast 86-ing of sold-out dishes from mobile POS)',
+          'Automated Recipe & Raw Ingredient Stock Depletion on Order Placement',
+          'Multi-modifier Nesting (Sizes, toppings, allergy flags, and special instructions)'
+        ]
+      },
+      {
+        question: 'Which ordering and payment model fits your customer dining flow?',
+        why: 'Controls checkout UX, QR code generation, and payment gateway settlement.',
+        options: [
+          'Contactless QR Table Ordering with Direct Apple Pay / Credit Card Checkout',
+          'Split-Bill Ordering (Guests pay their individual shares at the table)',
+          'Counter Pay / Pay-on-Delivery with Thermal Receipt Printer Integration'
+        ]
+      }
+    ];
+  }
+
+  // General Dynamic Fallback
+  return [
+    {
+      question: 'Which transactional persistence and schema engine fits your data model?',
+      why: 'Dictates write scalability, indexing strategy, and database read replica topology.',
+      options: [
+        'PostgreSQL + Prisma / SQLAlchemy (Strict ACID compliance & structured relational integrity)',
+        'MongoDB / DocumentDB (Flexible dynamic schema with JSON document storage)',
+        'Supabase / Managed Serverless Postgres (Instant realtime subscriptions & auth)'
+      ]
+    },
+    {
+      question: 'What authentication & session management strategy do you prefer?',
+      why: 'Secures user sessions, API routes, and OAuth federated provider logins.',
+      options: [
+        'JWT + OAuth 2.0 (Google & GitHub social logins with stateless tokens)',
+        'Clerk / Auth0 Managed Service (Zero-maintenance hosted login & user profiles)',
+        'Session-based Cookies with Redis Store (Enterprise stateful authentication)'
+      ]
+    },
+    {
+      question: 'What is your target deployment and infrastructure runtime?',
+      why: 'Determines CI/CD pipeline, container orchestration, and monthly cloud hosting expenses.',
+      options: [
+        'Docker Compose + AWS ECS / Fly.io (Standard portable containerized deployment)',
+        'Vercel + Supabase Serverless (Zero-DevOps instant global edge hosting)',
+        'Kubernetes / Helm Charts (Enterprise multi-cluster high availability)'
+      ]
+    }
+  ];
+}
+
 /* ──────────────── SYNTHESIZE PROS & CONS, COMPETITORS & OPEN SOURCE (ZERO-FAILURE) ──────────────── */
 export function synthesizeProsAndConsAndCompetitors(rawText = '', title = '', corePurpose = '') {
   const combined = `${rawText} ${title} ${corePurpose}`.toLowerCase();
 
-  // 1. Accessibility / Visually Impaired / Screen Reader / Blind
+  // 1. Hotel / Travel / Booking / Hospitality
+  if (
+    combined.includes('hotel') ||
+    combined.includes('hotal') ||
+    combined.includes('booking') ||
+    combined.includes('reserv') ||
+    combined.includes('stay') ||
+    combined.includes('room') ||
+    combined.includes('airbnb') ||
+    combined.includes('hospitality') ||
+    combined.includes('travel') ||
+    combined.includes('hostel')
+  ) {
+    return {
+      prosAndCons: {
+        pros: [
+          {
+            title: 'High-Concurrency Atomic Room Lock Engine',
+            detail: 'Redis distributed mutex with 10-minute automatic checkout TTL guarantees zero double-bookings during flash sales and peak seasonal rushes.',
+            badge: 'Concurrency'
+          },
+          {
+            title: 'Multi-Currency Global Checkout & Split Payouts',
+            detail: 'Stripe Connect integration automates direct payouts to hotel owners while deducting platform commissions with automated tax compliance.',
+            badge: 'Revenue'
+          },
+          {
+            title: 'Real-Time Date Range & Geospatial Indexing',
+            detail: 'PostgreSQL PostGIS and GiST availability range indexes allow travelers to filter thousands of rooms across dynamic dates in <30ms.',
+            badge: 'Performance'
+          },
+          {
+            title: 'Automated Guest Itinerary & QR Check-in',
+            detail: 'Asynchronous Celery/BullMQ workers generate dynamic PDF booking vouchers, send calendar invites, and issue secure QR codes for front desk check-in.',
+            badge: 'Automation'
+          }
+        ],
+        cons: [
+          {
+            title: 'Abandoned Checkout Inventory Lock Stalls',
+            detail: 'Guests abandoning payment screens while rooms are temporarily locked can artificially depress live room availability for other shoppers.',
+            mitigation: 'Implement aggressive 8-10 minute lock timeouts with real-time countdown timers and automated Redis key expiration events.',
+            badge: 'Conversion'
+          },
+          {
+            title: 'External Channel Manager (OTA) Sync Lag',
+            detail: 'Syncing availability with third-party OTAs (Expedia, Booking.com) via external APIs can introduce 1-3 minute latency windows.',
+            mitigation: 'Deploy dedicated webhook web receivers with two-way channel manager webhooks and automated calendar ICAL reconciliation.',
+            badge: 'Sync'
+          },
+          {
+            title: 'Peak Season Write Contention',
+            detail: 'High-volume concurrent write attempts on popular properties can cause database lock contention.',
+            mitigation: 'Use Redis atomic decrements for instant room holds before persisting confirmed bookings to PostgreSQL with SERIALIZABLE isolation.',
+            badge: 'Throughput'
+          }
+        ]
+      },
+      similarWebsites: [
+        {
+          name: 'Booking.com',
+          url: 'https://www.booking.com',
+          category: 'Market Leader / Global Travel OTA',
+          description: 'Global online travel agency connecting millions of travelers with hotels, vacation homes, and resorts worldwide.',
+          moat: 'Our solution provides an open, custom-branded direct booking platform eliminating 15-25% third-party OTA commission fees.'
+        },
+        {
+          name: 'Airbnb',
+          url: 'https://www.airbnb.com',
+          category: 'Hospitality & Vacation Rentals',
+          description: 'P2P platform connecting property hosts with travelers for short-term stays and boutique lodging.',
+          moat: 'Provides hotels and property managers with direct guest communication, zero platform lock-in, and custom pricing algorithms.'
+        },
+        {
+          name: 'HotelTonight',
+          url: 'https://www.hoteltonight.com',
+          category: 'Last-Minute Mobile Hotel Booking',
+          description: 'Mobile booking app offering curated discounts on unreserved same-day and next-day hotel rooms.',
+          moat: 'Seamless fullstack starter with automated channel management, customizable multi-vendor payouts, and zero recurring SaaS costs.'
+        }
+      ],
+      openSourceProjects: [
+        {
+          name: 'Cal.com Booking Core',
+          repo: 'calcom/cal.com',
+          url: 'https://github.com/calcom/cal.com',
+          stars: '⭐ 32.4k',
+          techStack: 'TypeScript, Next.js, Prisma, PostgreSQL',
+          description: 'Open source scheduling and booking infrastructure for appointments, reservations, and time-slot allocations.',
+          integration: 'Reference architecture for date range scheduling, time-zone normalization, and calendar sync.'
+        },
+        {
+          name: 'Bokun Booking Engine',
+          repo: 'bokun/booking-engine',
+          url: 'https://github.com/bokun/booking-engine',
+          stars: '⭐ 4.8k',
+          techStack: 'TypeScript, React, Node.js',
+          description: 'Open-source reservation engine for managing inventory, tour slots, and hospitality checkout.',
+          integration: 'Provides structural design for room cataloging, guest capacity, and pricing modifiers.'
+        },
+        {
+          name: 'Airbnb Clone / React Booking',
+          repo: 'airbnb-clone/booking-app',
+          url: 'https://github.com/airbnb-clone/booking-app',
+          stars: '⭐ 12.5k',
+          techStack: 'React 19, FastAPI, PostgreSQL, Tailwind',
+          description: 'Fullstack property and room booking application with interactive map search and Stripe checkout.',
+          integration: 'Supplies UI components for room image galleries, interactive date pickers, and guest reviews.'
+        }
+      ],
+      githubSearchTerms: ['hotel-booking', 'hotel-reservation', 'booking-system', 'room-availability-engine']
+    };
+  }
+
+  // 2. E-Commerce / Store / Retail / Marketplace
+  if (
+    combined.includes('ecom') ||
+    combined.includes('shop') ||
+    combined.includes('store') ||
+    combined.includes('cart') ||
+    combined.includes('checkout') ||
+    combined.includes('market') ||
+    combined.includes('retail')
+  ) {
+    return {
+      prosAndCons: {
+        pros: [
+          {
+            title: 'Sub-50ms Headless Storefront Performance',
+            detail: 'Edge-cached catalog with React 19 server rendering delivers near-instant product browsing and 99+ Google Lighthouse scores.',
+            badge: 'Speed'
+          },
+          {
+            title: 'Flash-Sale Resilient Inventory Engine',
+            detail: 'Redis atomic counter decrements prevent stock overselling even when thousands of shoppers click Buy Now simultaneously.',
+            badge: 'Scalability'
+          },
+          {
+            title: 'Omnichannel Payment Gateway Routing',
+            detail: 'Direct Stripe & PayPal webhooks with automatic idempotency handling and instant order receipt generation.',
+            badge: 'Revenue'
+          }
+        ],
+        cons: [
+          {
+            title: 'Cart Abandonment Rate',
+            detail: 'Unexpected shipping costs or complicated registration steps cause high checkout drop-offs.',
+            mitigation: 'Implement one-click guest checkout, Apple Pay / Google Pay direct authorization, and automated abandoned cart recovery emails.',
+            badge: 'Conversion'
+          },
+          {
+            title: 'Payment Webhook Idempotency Failures',
+            detail: 'Duplicate webhook deliveries from payment gateways can trigger duplicate customer orders or double billing.',
+            mitigation: 'Enforce transactional database constraints with unique event IDs and Redis idempotency locks on all webhook handlers.',
+            badge: 'Integrity'
+          }
+        ]
+      },
+      similarWebsites: [
+        {
+          name: 'Shopify',
+          url: 'https://www.shopify.com',
+          category: 'Market Leader / Commerce SaaS',
+          description: 'Global commerce platform powering online stores and retail point-of-sale systems.',
+          moat: 'Zero monthly percentage platform cuts, complete database autonomy, and custom headless frontend portability.'
+        },
+        {
+          name: 'MedusaJS',
+          url: 'https://medusajs.com',
+          category: 'Open-Source Headless Commerce',
+          description: 'Modular building blocks for digital commerce with Node.js backend and modern storefronts.',
+          moat: 'Turnkey fullstack starter pre-configured with FastAPI, PostgreSQL, Redis, and React 19.'
+        }
+      ],
+      openSourceProjects: [
+        {
+          name: 'Medusa Core',
+          repo: 'medusajs/medusa',
+          url: 'https://github.com/medusajs/medusa',
+          stars: '⭐ 26.2k',
+          techStack: 'TypeScript, Node.js, PostgreSQL, Redis',
+          description: 'The open source alternative to Shopify for building custom digital commerce experiences.',
+          integration: 'Reference for modular cart handling, product variant modeling, and discount logic.'
+        },
+        {
+          name: 'Saleor Commerce',
+          repo: 'saleor/saleor',
+          url: 'https://github.com/saleor/saleor',
+          stars: '⭐ 20.1k',
+          techStack: 'Python, Django, GraphQL, PostgreSQL',
+          description: 'High-performance headless e-commerce platform delivering ultra-fast multi-channel shopping.',
+          integration: 'Architectural pattern for GraphQL product schemas and multi-warehouse inventory tracking.'
+        }
+      ],
+      githubSearchTerms: ['ecommerce-platform', 'headless-commerce', 'shopping-cart-engine', 'online-store-starter']
+    };
+  }
+
+  // 3. Accessibility / Visually Impaired / Screen Reader / Blind
   if (
     combined.includes('blind') ||
     combined.includes('visually impaired') ||
@@ -939,10 +1647,6 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
   // Strip conversational filler so "MY IDEA IS TO CREATE A WEBSITE FOR BLIND PEOPLE" becomes "create a website for blind people"
   cleaned = cleaned.replace(/^(my\s+idea\s+is\s+to|i\s+want\s+to\s+build|i\s+want\s+to\s+create|i\s+would\s+like\s+to|we\s+want\s+to|project\s+idea\s*:?|build\s+a|create\s+a|make\s+a)\s+/gi, '').trim();
   const raw = (cleaned || ideaText || '').toLowerCase();
-  
-  let title = 'CloudScale Architecture';
-  let oneLiner = 'Production-ready modern web architecture with resilient cloud services.';
-  let corePurpose = 'Transforms complex distributed system requirements into an optimized, maintainable architecture with modular services and automated deployments.';
 
   // 1. Accessibility & Assistive Tech for Blind / Visually Impaired
   if (
@@ -1125,107 +1829,141 @@ export function synthesizeSmartUnderstanding(ideaText = '') {
       ],
       ...synthesizeProsAndConsAndCompetitors(raw, 'SmartID — Automated Identity & Document Verification Engine', 'Extracts key credentials from uploaded physical ID cards using multimodal OCR, verifies integrity against institutional records.')
     };
-  } else if (raw.includes('video') || raw.includes('stream') || raw.includes('webrtc')) {
-    title = 'Decentralized Video Streamer';
-    oneLiner = 'P2P low-latency video streaming platform with edge mesh networking and encryption.';
-    corePurpose = 'Empowers low-latency content broadcasting across decentralized nodes, minimizing bandwidth costs via peer mesh protocols and zero-trust authentication.';
-  } else if (raw.includes('habit') || raw.includes('health') || raw.includes('coach')) {
-    title = 'AI Habit & Behavioral Coach';
-    oneLiner = 'Multimodal habit tracking copilot powered by intelligent adaptive interventions.';
-    corePurpose = 'Analyzes daily routines, tracks habit milestones with predictive behavioral nudges, and delivers personalized coaching plans.';
-  } else if (raw.includes('github') || raw.includes('issue') || raw.includes('triage') || raw.includes('pr')) {
-    title = 'Autonomous GitHub Triage Bot';
-    oneLiner = 'AI-driven repository issue triage and automated pull request generation agent.';
-    corePurpose = 'Monitors open-source issues, locates impacted repository code paths, suggests reproducible unit tests, and drafts PR branches automatically.';
-  } else if (raw.includes('devops') || raw.includes('cluster') || raw.includes('docker') || raw.includes('cloud')) {
-    title = 'DevOps Multi-Cluster Wizard';
-    oneLiner = 'Zero-downtime infrastructure orchestration and container topology manager.';
-    corePurpose = 'Automates Kubernetes cluster deployments, synchronizes secret management, and monitors telemetry across hybrid clouds.';
-  } else if (raw.includes('napkin') || raw.includes('hand-drawn') || raw.includes('sketch') || raw.includes('whiteboard')) {
-    title = 'Napkin Cloud Architecture Blueprint';
-    oneLiner = 'Production full-stack cloud system synthesized directly from your whiteboard architectural sketch.';
-    corePurpose = 'Transforms hand-drawn napkin whiteboard diagrams into scalable microservices with resilient caching, relational persistence, and event-driven worker pipelines.';
-  } else if (raw.includes('హలో') || raw.includes('hello') || raw.includes('voice') || raw.includes('assistant') || raw.includes('dictat')) {
-    title = 'Voice-Enabled AI Assistant Web Portal';
-    oneLiner = 'Voice-driven conversational AI web application with multi-lingual speech recognition and audio feedback.';
-    corePurpose = 'Enables real-time voice interaction, automatic multi-language speech recognition, and natural language query processing.';
-  } else if (cleaned.length > 5) {
-    const words = cleaned.split(/\s+/).filter(w => !['a', 'an', 'the', 'for', 'to', 'of', 'in', 'on', 'with', 'and', 'my', 'is'].includes(w.toLowerCase())).slice(0, 4);
-    title = words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'CloudScale Platform';
-    oneLiner = `High-impact production architecture for ${cleaned.slice(0, 70)}...`;
-    corePurpose = `Engineered to deliver high performance, modular maintainability, and production reliability for ${cleaned}.`;
+  }
+
+  // Domain-Aware Identity & Question Extraction (Zero-Failure Fallback)
+  const smartIdentity = extractSmartProjectIdentity(cleaned || ideaText);
+  const domain = smartIdentity.domain;
+  const title = smartIdentity.projectTitle;
+  const oneLiner = smartIdentity.oneLiner;
+  const corePurpose = smartIdentity.corePurpose;
+  const clarifyingQuestions = generateDomainClarifyingQuestions(ideaText, domain);
+  const enriched = synthesizeProsAndConsAndCompetitors(raw, title, corePurpose);
+
+  let keyActors = ['End-User / Client', 'API Gateway Service', 'Background Worker & Scheduler', 'System Administrator'];
+  let coreWorkflow = 'Client Request → API Gateway Validation → Asynchronous Worker Processing → Cache / Database Mutation → Real-Time Notification';
+  let identifiedComponents = [
+    { name: 'Web Client UI', role: 'Interactive responsive user interface with real-time UI updates', type: 'frontend' },
+    { name: 'API Gateway', role: 'Authentication, request validation, rate limiting, and route dispatching', type: 'backend' },
+    { name: 'Relational Database', role: 'ACID transactional data storage and relational entities', type: 'database' },
+    { name: 'Redis Cache & Queue', role: 'High-speed in-memory caching and asynchronous job queueing', type: 'cache' },
+    { name: 'AI Reasoning Engine', role: 'Contextual inference, automated classification, and intelligent recommendations', type: 'ai' }
+  ];
+  let dataFlows = [
+    { from: 'Web Client UI', to: 'API Gateway', description: 'HTTPS REST & Secure WebSocket' },
+    { from: 'API Gateway', to: 'Redis Cache & Queue', description: 'In-Memory Key/Value & PubSub' },
+    { from: 'API Gateway', to: 'Relational Database', description: 'Connection Pool with Prisma/SQLAlchemy' },
+    { from: 'API Gateway', to: 'AI Reasoning Engine', description: 'JSON Payload with Streaming Tokens' }
+  ];
+  let innovationSuggestions = [
+    { title: 'Edge Caching & Global CDN', description: 'Cache static assets and API read queries at Cloudflare edge nodes for sub-20ms latency worldwide.', complexity: 'Medium' },
+    { title: 'Event-Driven Asynchronous Pipeline', description: 'Decouple long-running tasks using Redis Celery / BullMQ workers so user requests respond in <100ms.', complexity: 'Low' },
+    { title: 'Multimodal Telemetry & AI Observability', description: 'Real-time trace logs and automated anomaly alerts triggered before users experience latency spikes.', complexity: 'High' }
+  ];
+
+  if (domain === 'hotel') {
+    keyActors = ['Traveler / Hotel Guest', 'Hotel Front Desk / Host', 'Channel Manager & OTA Sync Worker', 'Payment & Escrow Gateway', 'Platform Administrator'];
+    coreWorkflow = 'Guest Searches Dates & Rooms → PostGIS Geospatial & GiST Availability Query → Room Selected with Redis 10-Min Mutex Lock → Stripe Checkout with Escrow → Instant Confirmation Voucher with QR Code → Front Desk Check-in';
+    identifiedComponents = [
+      { name: 'Guest Booking Web & Mobile Client', role: 'Interactive date-range calendar, dynamic room gallery, and location map UI', type: 'frontend' },
+      { name: 'Reservation & Inventory API Gateway', role: 'FastAPI / Node.js service handling double-booking mutex locking, search filters, and auth', type: 'backend' },
+      { name: 'Hotel Availability & Geospatial Store', role: 'PostgreSQL 16 + PostGIS + GiST date range indexes for instant availability lookups', type: 'database' },
+      { name: 'Redis Hold Cache & Event Queue', role: '10-minute hold TTLs, atomic room stock decrements, and session state', type: 'cache' },
+      { name: 'Automated Itinerary & QR Voucher Worker', role: 'Celery / BullMQ generating PDF vouchers, calendar sync, and QR check-in codes', type: 'other' },
+      { name: 'Payment & Stripe Connect Splitter', role: 'Direct host payouts minus commission with automated refund escrow', type: 'other' }
+    ];
+    dataFlows = [
+      { from: 'Guest Booking Web & Mobile Client', to: 'Reservation & Inventory API Gateway', description: 'Date query & room selection with JWT auth' },
+      { from: 'Reservation & Inventory API Gateway', to: 'Redis Hold Cache & Event Queue', description: 'Atomic Redlock mutex (10-min reservation hold)' },
+      { from: 'Reservation & Inventory API Gateway', to: 'Hotel Availability & Geospatial Store', description: 'Indexed GiST date overlap query' },
+      { from: 'Reservation & Inventory API Gateway', to: 'Payment & Stripe Connect Splitter', description: 'Stripe payment capture & escrow hold' },
+      { from: 'Reservation & Inventory API Gateway', to: 'Automated Itinerary & QR Voucher Worker', description: 'Async event to dispatch PDF & QR voucher' }
+    ];
+    innovationSuggestions = [
+      { title: 'Dynamic Yield Management & Surge Pricing', description: 'Automated ML pricing algorithm adjusting room rates based on local occupancy rates, holidays, and booking pace.', complexity: 'Medium' },
+      { title: 'Contactless Mobile Key & QR Check-In', description: 'Generates encrypted time-sensitive QR access tokens allowing guests to bypass the front desk and check in directly.', complexity: 'Low' },
+      { title: 'Two-Way Instant Channel Manager Sync', description: 'Bi-directional webhooks synchronizing live availability between your direct portal, Booking.com, and Airbnb in <2s.', complexity: 'High' }
+    ];
+  } else if (domain === 'ecommerce') {
+    keyActors = ['Online Shopper', 'Merchant / Store Owner', 'Warehouse & Fulfillment Operator', 'Payment Gateway (Stripe/PayPal)', 'Inventory Sync Worker'];
+    coreWorkflow = 'Product Catalog Discovery & Faceted Filtering → Cart Addition with Redis Stock Hold → Idempotent Stripe Checkout → Asynchronous Order Fulfillment Webhook → Real-Time Delivery Tracking';
+    identifiedComponents = [
+      { name: 'Storefront Shopping Client', role: 'React 19 + Headless UI with sub-10ms instant search and faceted filtering', type: 'frontend' },
+      { name: 'Commerce API Gateway', role: 'FastAPI / NestJS service handling cart state, checkout orchestration, and JWT auth', type: 'backend' },
+      { name: 'Product Catalog & Order Database', role: 'PostgreSQL 16 with JSONB product variants, relational stock counts, and ACID orders', type: 'database' },
+      { name: 'Redis Cart & Flash-Sale Queue', role: 'Atomic stock decrements with 15-minute checkout TTL and session caching', type: 'cache' },
+      { name: 'Order Fulfillment & Webhook Worker', role: 'Celery / BullMQ worker dispatching warehouse orders, invoices, and shipping tracking', type: 'other' }
+    ];
+    dataFlows = [
+      { from: 'Storefront Shopping Client', to: 'Commerce API Gateway', description: 'GraphQL / REST catalog queries and cart actions' },
+      { from: 'Commerce API Gateway', to: 'Redis Cart & Flash-Sale Queue', description: 'Atomic inventory decrement with TTL hold' },
+      { from: 'Commerce API Gateway', to: 'Product Catalog & Order Database', description: 'ACID transaction write for verified orders' },
+      { from: 'Commerce API Gateway', to: 'Order Fulfillment & Webhook Worker', description: 'Async message to trigger warehouse packaging & shipping API' }
+    ];
+    innovationSuggestions = [
+      { title: 'Flash-Sale Anti-Bot Inventory Shield', description: 'Proof-of-work challenge token and Redis token bucket preventing scalper bots from exhausting limited stock.', complexity: 'Medium' },
+      { title: 'Instant Semantic Product Discovery', description: 'Natural language search powered by vector embeddings and Meilisearch with instant typo tolerance.', complexity: 'Low' },
+      { title: 'Autonomous Multi-Carrier Shipping Broker', description: 'Automatically compares live rates across FedEx, UPS, and DHL to select the fastest, lowest-cost carrier route.', complexity: 'High' }
+    ];
+  } else if (domain === 'restaurant') {
+    keyActors = ['Dining Guest', 'Kitchen Head Chef', 'Waitstaff / Floor Host', 'Restaurant Manager', 'POS Payment Terminal'];
+    coreWorkflow = 'Table Reservation / QR Menu Scan → Real-Time Kitchen Display Order Broadcast → Live Preparation Status Updates → Contactless Table Checkout → Automated Review Feedback';
+    identifiedComponents = [
+      { name: 'Guest Mobile Menu & Booking Client', role: 'Responsive PWA with QR code table ordering, allergen filters, and reservation calendar', type: 'frontend' },
+      { name: 'Restaurant Operations Gateway', role: 'FastAPI / Node.js service managing table state, order tickets, and staff permissions', type: 'backend' },
+      { name: 'Kitchen Display System (KDS)', role: 'Low-latency WebSocket interface displaying live kitchen tickets prioritized by cook times', type: 'frontend' },
+      { name: 'Menu & Table Inventory Store', role: 'PostgreSQL with relational table layouts, daily special stock limits, and receipt logs', type: 'database' },
+      { name: 'Redis Live Order PubSub', role: 'Real-time WebSocket event broadcaster for instant ticket printing and status sync', type: 'cache' }
+    ];
+    dataFlows = [
+      { from: 'Guest Mobile Menu & Booking Client', to: 'Restaurant Operations Gateway', description: 'QR menu order payload & tip selection' },
+      { from: 'Restaurant Operations Gateway', to: 'Redis Live Order PubSub', description: 'Real-time WebSocket ticket broadcast to kitchen display' },
+      { from: 'Kitchen Display System (KDS)', to: 'Restaurant Operations Gateway', description: 'Chef marks dish status (PREPARING → READY)' },
+      { from: 'Restaurant Operations Gateway', to: 'Menu & Table Inventory Store', description: 'Relational persistence of ticket receipt and table turnover' }
+    ];
+    innovationSuggestions = [
+      { title: 'Predictive Kitchen Prep & Table Turn AI', description: 'Estimates dish preparation time and table turnover using historical order flow to optimize guest seating.', complexity: 'Medium' },
+      { title: 'Smart Allergen & Dietary Filter', description: 'Dynamic menu customization that automatically highlights gluten-free, vegan, and allergen-safe options.', complexity: 'Low' },
+      { title: 'Automated Dynamic Floorplan Optimization', description: 'Real-time table rearrangement recommendations maximizing floor capacity for peak weekend hours.', complexity: 'High' }
+    ];
+  } else if (domain === 'healthcare') {
+    keyActors = ['Patient', 'Consulting Physician', 'Clinical Administrator', 'Pharmacy Network', 'HIPAA Compliance Officer'];
+    coreWorkflow = 'Patient Symptom Triage → Encrypted WebRTC Video Consultation → Clinician Digital Prescription Creation → HL7/FHIR Health Record Encryption → Pharmacy Notification';
+    identifiedComponents = [
+      { name: 'Patient & Clinician Portal', role: 'HIPAA-compliant responsive interface with appointment calendar and digital intake forms', type: 'frontend' },
+      { name: 'Clinical Telehealth Gateway', role: 'FastAPI service enforcing AES-256 field encryption, role-based access control, and audit logs', type: 'backend' },
+      { name: 'Encrypted WebRTC Video Engine', role: 'Sub-300ms peer-to-peer clinical video consultation with end-to-end encryption', type: 'ai' },
+      { name: 'FHIR Health Record Store', role: 'PostgreSQL with pgcrypto storing HL7/FHIR standard electronic health records', type: 'database' },
+      { name: 'Audit & Compliance Logger', role: 'Immutable append-only access log verifying zero unauthorized patient record views', type: 'cache' }
+    ];
+    dataFlows = [
+      { from: 'Patient & Clinician Portal', to: 'Clinical Telehealth Gateway', description: 'TLS 1.3 encrypted clinical intake data and auth tokens' },
+      { from: 'Clinical Telehealth Gateway', to: 'Encrypted WebRTC Video Engine', description: 'Secure room token exchange for peer video call' },
+      { from: 'Clinical Telehealth Gateway', to: 'FHIR Health Record Store', description: 'AES-256 encrypted write to patient electronic chart' },
+      { from: 'Clinical Telehealth Gateway', to: 'Audit & Compliance Logger', description: 'HIPAA compliance audit entry with timestamp and practitioner ID' }
+    ];
+    innovationSuggestions = [
+      { title: 'Ambient Clinical Voice Scribe', description: 'Transcribes patient consultation audio and formats structured SOAP clinical notes automatically.', complexity: 'High' },
+      { title: 'Automated Drug Interaction Warning', description: 'Cross-checks prescribed medications against patient allergy history and contraindications in real time.', complexity: 'Medium' },
+      { title: 'Zero-Knowledge Patient Vault', description: 'Patients hold client-side private keys so even cloud server administrators cannot decrypt medical records.', complexity: 'High' }
+    ];
   }
 
   return {
+    ...enriched,
     projectTitle: title,
     oneLiner,
     corePurpose,
-    keyActors: ['End-User / Client', 'API Gateway Service', 'Background Worker & Scheduler', 'System Administrator'],
-    coreWorkflow: 'Client Request → API Gateway Validation → Asynchronous Worker Processing → Cache / Database Mutation → WebSocket / Real-time Notification',
-    identifiedComponents: [
-      { name: 'Web Client UI', role: 'Interactive responsive user interface with real-time UI updates', type: 'frontend' },
-      { name: 'API Gateway', role: 'Authentication, request validation, rate limiting, and route dispatching', type: 'backend' },
-      { name: 'Relational Database', role: 'ACID transactional data storage and relational entities', type: 'database' },
-      { name: 'Redis Cache & Queue', role: 'High-speed in-memory caching and asynchronous job queueing', type: 'cache' },
-      { name: 'AI Reasoning Engine', role: 'Contextual inference, automated classification, and intelligent recommendations', type: 'ai' }
-    ],
-    dataFlows: [
-      { from: 'Web Client UI', to: 'API Gateway', description: 'HTTPS REST & Secure WebSocket' },
-      { from: 'API Gateway', to: 'Redis Cache & Queue', description: 'In-Memory Key/Value & PubSub' },
-      { from: 'API Gateway', to: 'Relational Database', description: 'Connection Pool with Prisma/SQLAlchemy' },
-      { from: 'API Gateway', to: 'AI Reasoning Engine', description: 'JSON Payload with Streaming Tokens' }
-    ],
-    clarifyingQuestions: [
-      {
-        question: 'Which primary database engine fits your transaction and schema model?',
-        why: 'Dictates write scalability, indexing strategy, and read replica topologies.',
-        options: [
-          'PostgreSQL + Prisma ORM (ACID compliance & structured relational integrity)',
-          'MongoDB / DocumentDB (Flexible dynamic schema with JSON document storage)',
-          'Supabase / Managed Serverless Postgres (Instant realtime subscriptions & auth)'
-        ]
-      },
-      {
-        question: 'What authentication & user management strategy do you prefer?',
-        why: 'Secures user sessions, API routes, and OAuth federated provider logins.',
-        options: [
-          'JWT + OAuth 2.0 (Google & GitHub social logins with stateless tokens)',
-          'Clerk / Auth0 Managed Service (Zero-maintenance hosted login & user profiles)',
-          'Session-based Cookies with Redis Store (Enterprise stateful authentication)'
-        ]
-      },
-      {
-        question: 'What is your target deployment and infrastructure runtime?',
-        why: 'Determines CI/CD pipeline, container orchestration, and monthly cloud hosting expenses.',
-        options: [
-          'Docker Compose + AWS ECS / Fly.io (Standard portable containerized deployment)',
-          'Vercel + Supabase Serverless (Zero-DevOps instant global edge hosting)',
-          'Kubernetes / Helm Charts (Enterprise multi-cluster high availability)'
-        ]
-      }
-    ],
-    innovationSuggestions: [
-      {
-        title: 'Edge Caching & Global CDN',
-        description: 'Cache static assets and API read queries at Cloudflare edge nodes for sub-20ms latency worldwide.',
-        complexity: 'Medium'
-      },
-      {
-        title: 'Event-Driven Asynchronous Pipeline',
-        description: 'Decouple long-running tasks using Redis Celery / BullMQ workers so user requests respond in <100ms.',
-        complexity: 'Low'
-      },
-      {
-        title: 'Multimodal Telemetry & AI Observability',
-        description: 'Real-time trace logs and automated anomaly alerts triggered before users experience latency spikes.',
-        complexity: 'High'
-      }
-    ],
+    keyActors,
+    coreWorkflow,
+    identifiedComponents,
+    dataFlows,
+    clarifyingQuestions,
+    innovationSuggestions,
     assumptions: [
       'Targeting MVP launch with capacity to scale to 50,000 daily active users without architectural rewrites.',
       'Containerized with Docker to guarantee zero environment discrepancy between local dev and cloud production.'
-    ],
-    ...synthesizeProsAndConsAndCompetitors(raw, title, corePurpose)
+    ]
   };
 }
 
@@ -1331,43 +2069,17 @@ export function synthesizeSmartBlueprint(understanding = {}, userRefinements = '
   class UI client;
   class API,Session,Worker gateway;
   class OCR,Biometrics vision;
-  class DB,Vault storage;` : `graph LR
-  subgraph Client Tier
-    UI["💻 Web / Mobile UI<br/>(React 19 + Vite + Tailwind)"]
-  end
-
-  subgraph Gateway & Services
-    API["⚡ API Gateway<br/>(FastAPI / Node.js)"]
-    AUTH["🛡️ Auth & Security<br/>(OAuth2 + JWT)"]
-    WORKER["⚙️ Background Worker<br/>(Celery / BullMQ)"]
-  end
-
-  subgraph Data & Storage
-    DB[("🗄️ PostgreSQL<br/>(Primary ACID)")]
-    CACHE[("⚡ Redis Cache<br/>(Sessions & Queue)")]
-  end
-
-  subgraph AI Engine
-    AI["🧠 Gemini / Gemma Engine<br/>(Inference & Vision)"]
-  end
-
-  UI -->|HTTPS / WSS| API
-  API --> AUTH
-  API -->|Read/Write| DB
-  API -->|Fast Cache| CACHE
-  API -->|Async Tasks| WORKER
-  WORKER --> DB
-  API -->|REST API| AI
-
-  classDef client fill:#00c8ff15,stroke:#00c8ff,stroke-width:2px;
-  classDef gateway fill:#8b5cf615,stroke:#8b5cf6,stroke-width:2px;
-  classDef data fill:#f59e0b15,stroke:#f59e0b,stroke-width:2px;
-  classDef ai fill:#10b98115,stroke:#10b981,stroke-width:2px;
-
-  class UI client;
-  class API,AUTH,WORKER gateway;
-  class DB,CACHE data;
-  class AI ai;`;
+  class DB,Vault storage;` : buildSolidArchitectureDiagram(understanding, {
+    frontend: { name: 'React 19 + Vite + Tailwind' },
+    backend: { name: 'FastAPI / Node.js' },
+    database: { name: 'PostgreSQL (Primary ACID)' },
+    extras: [
+      { name: 'Redis Cache (Sessions & Queue)' },
+      { name: 'Background Worker (Celery / BullMQ)' },
+      { name: 'Auth & Security (OAuth2 + JWT)' }
+    ],
+    ai: { name: 'Gemini / Gemma Engine (Inference & Vision)' }
+  });
 
   const fileTree = [
     {
@@ -1608,22 +2320,23 @@ class AccessibleAudioService:
       ],
       marketSize: isA11yProject ? '$13.2B Global Assistive Technology & Digital Accessibility Market' : isIdCardProject ? '$24.8B Global Identity Verification & Digital KYC Market' : '$18.4B Global Developer Tooling & DevOps Platform Market'
     },
-    githubSearchTerms: isA11yProject ? [
-      'web-speech-api-react',
-      'screen-reader-accessibility',
-      'wcag-aaa-accessible-template',
-      'whisper-voice-assistant-fastapi'
-    ] : isIdCardProject ? [
-      'id-card-ocr',
-      'identity-verification-fastapi',
-      'document-scanner-react',
-      'face-verification-pipeline'
-    ] : [
-      slug,
-      'fastapi-react-starter',
-      'docker-compose-production-template',
-      'ai-architecture-blueprint'
-    ],
+    githubSearchTerms: (understanding?.githubSearchTerms && understanding.githubSearchTerms.length > 0 && !understanding.githubSearchTerms.some(t => t.includes('i-need-create-')))
+      ? understanding.githubSearchTerms
+      : isA11yProject ? [
+        'web-speech-api-react',
+        'screen-reader-accessibility',
+        'wcag-aaa-accessible-template',
+        'whisper-voice-assistant-fastapi'
+      ] : isIdCardProject ? [
+        'id-card-ocr',
+        'identity-verification-fastapi',
+        'document-scanner-react',
+        'face-verification-pipeline'
+      ] : (synthesizeProsAndConsAndCompetitors(combinedContext, title, understanding?.corePurpose)?.githubSearchTerms || [
+        slug.replace(/^i-need-create-/, ''),
+        'fastapi-react-starter',
+        'docker-compose-production-template'
+      ]),
     starterRepo: {
       repoName: `${slug}-starter`,
       description: `Production starter repository for ${title}`,
