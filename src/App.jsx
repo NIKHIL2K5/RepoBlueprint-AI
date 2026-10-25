@@ -655,6 +655,7 @@ export default function App() {
               type="button"
               className="btn btn-ghost topbar-cld-btn"
               onClick={() => setCloudinaryModalOpen(true)}
+              aria-label="Cloudinary Media Asset Vault & Config"
               title="Cloudinary Media Asset Vault & Config"
             >
               ☁️ Cloudinary
@@ -667,6 +668,7 @@ export default function App() {
                   setAuthMode('profile');
                   setAuthModalOpen(true);
                 }}
+                aria-label={`User account: ${currentUser.fullName} (@${currentUser.username})`}
                 title={`User: ${currentUser.fullName} (@${currentUser.username})`}
               >
                 <img src={currentUser.avatarUrl} alt="" className="topbar-user-avatar" />
@@ -697,7 +699,14 @@ export default function App() {
               </button>
             )}
             <ThemeToggle />
-            <button className="btn btn-ghost" onClick={handleLogout} title="Change AI settings" id="settings-btn">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleLogout}
+              aria-label="Change AI settings"
+              title="Change AI settings"
+              id="settings-btn"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />

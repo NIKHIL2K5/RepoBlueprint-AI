@@ -521,6 +521,7 @@ export default function AlignmentPhase({
                   placeholder="Or enter your custom architectural choice..."
                   value={customAnswer[qIdx] || ''}
                   onChange={(e) => setCustomAnswer(prev => ({ ...prev, [qIdx]: e.target.value }))}
+                  aria-label={`Custom architectural choice for question ${qIdx + 1}`}
                 />
               </div>
             ))}
@@ -537,6 +538,7 @@ export default function AlignmentPhase({
           value={additionalNotes}
           onChange={(e) => setAdditionalNotes(e.target.value)}
           rows={3}
+          aria-label="Additional constraints or preferences"
         />
       </div>
 

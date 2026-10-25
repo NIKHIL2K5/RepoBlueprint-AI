@@ -39,7 +39,10 @@
 }
 
 .dictation-lang-pill {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  min-height: 32px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--bg);
@@ -280,7 +283,10 @@
 }
 
 .sample-pill-btn {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  min-height: 32px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--bg);

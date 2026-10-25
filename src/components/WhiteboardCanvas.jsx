@@ -501,7 +501,7 @@ export default function WhiteboardCanvas({ onExportImage, currentUser }) {
         </div>
 
         {/* Color Palette */}
-        <div className="palette-group">
+        <div className="palette-group" role="group" aria-label="Drawing Color Palette">
           {PALETTE.map(p => (
             <button
               key={p.color}
@@ -509,6 +509,7 @@ export default function WhiteboardCanvas({ onExportImage, currentUser }) {
               className={`color-dot ${color === p.color ? 'selected' : ''}`}
               style={{ backgroundColor: p.color }}
               onClick={() => { setColor(p.color); if (tool === 'eraser') setTool('pen'); }}
+              aria-label={`Select drawing color ${p.label}`}
               title={p.label}
             />
           ))}
@@ -625,6 +626,8 @@ export default function WhiteboardCanvas({ onExportImage, currentUser }) {
                   type="button"
                   className="dialog-close-btn"
                   onClick={() => setTextModal(prev => ({ ...prev, isOpen: false }))}
+                  aria-label="Close text label dialog"
+                  title="Close"
                 >
                   ✕
                 </button>

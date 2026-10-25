@@ -183,7 +183,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 6px 10px;
+  min-height: 32px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-btn);
@@ -214,8 +215,10 @@
 
 /* Window minimize / close icon buttons */
 .ctrl-icon-btn {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -223,7 +226,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-btn);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
   cursor: pointer;
   transition: all var(--transition);
 }
@@ -561,8 +564,10 @@
 
 .copilot-mic-btn {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   border-radius: 50%;
   background: none;
   border: 1px solid var(--border);
@@ -570,7 +575,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
   transition: all var(--transition);
 }
@@ -588,8 +593,10 @@
 
 .copilot-send-btn {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   border-radius: 50%;
   background: var(--accent-button);
   border: none;
@@ -598,7 +605,7 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   transition: all var(--transition);
 }
 .copilot-send-btn:hover {

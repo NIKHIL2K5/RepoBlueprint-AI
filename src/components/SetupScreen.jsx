@@ -127,13 +127,22 @@ export default function SetupScreen({ onComplete }) {
           <p className="setup-engine-sub">Select how RepoBlueprint synthesizes your architecture.</p>
 
           {/* Provider Selection */}
-          <div className="provider-options">
+          <div className="provider-options" role="radiogroup" aria-label="Choose AI Engine">
             {/* Ollama */}
-            <button
-              type="button"
+            <div
+              role="radio"
+              aria-checked={provider === 'ollama'}
+              tabIndex={0}
               className={`provider-option ${provider === 'ollama' ? 'is-selected' : ''}`}
               onClick={() => setProvider('ollama')}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  setProvider('ollama');
+                }
+              }}
               id="select-ollama-btn"
+              aria-label="Local Ollama AI Engine"
             >
               <div className="provider-option-header">
                 <span className="provider-icon">🦙</span>
@@ -159,6 +168,7 @@ export default function SetupScreen({ onComplete }) {
                         type="button"
                         className={`model-chip ${ollamaModel === preset.id ? 'is-selected' : ''}`}
                         onClick={() => { setOllamaModel(preset.id); setCustomModel(''); }}
+                        aria-label={`Select ${preset.label || preset.id}`}
                       >
                         <span className="model-chip-name">{preset.label || preset.id}</span>
                         <span className="model-chip-desc">{preset.desc || ''}</span>
@@ -166,13 +176,15 @@ export default function SetupScreen({ onComplete }) {
                     ))}
                   </div>
                   <div className="config-field">
-                    <label className="config-label">Ollama Server URL</label>
+                    <label htmlFor="ollama-url-input" className="config-label">Ollama Server URL</label>
                     <input
+                      id="ollama-url-input"
                       type="text"
                       className="config-input"
                       value={ollamaUrl}
                       onChange={e => setOllamaUrl(e.target.value)}
                       placeholder="http://localhost:11434"
+                      aria-label="Ollama Server URL"
                     />
                   </div>
                   {ollamaConnected && (
@@ -183,14 +195,23 @@ export default function SetupScreen({ onComplete }) {
                   )}
                 </div>
               )}
-            </button>
+            </div>
 
             {/* Gemini */}
-            <button
-              type="button"
+            <div
+              role="radio"
+              aria-checked={provider === 'gemini'}
+              tabIndex={0}
               className={`provider-option ${provider === 'gemini' ? 'is-selected' : ''}`}
               onClick={() => setProvider('gemini')}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  setProvider('gemini');
+                }
+              }}
               id="select-gemini-btn"
+              aria-label="Google Gemini AI Engine"
             >
               <div className="provider-option-header">
                 <span className="provider-icon">✨</span>
@@ -212,6 +233,7 @@ export default function SetupScreen({ onComplete }) {
                         type="button"
                         className={`model-chip ${geminiModel === m.id ? 'is-selected' : ''}`}
                         onClick={() => setGeminiModel(m.id)}
+                        aria-label={`Select model ${m.label}`}
                       >
                         <span className="model-chip-name">{m.label}</span>
                         <span className="model-chip-desc">{m.desc}</span>
@@ -219,30 +241,41 @@ export default function SetupScreen({ onComplete }) {
                     ))}
                   </div>
                   <div className="config-field">
-                    <label className="config-label">
+                    <label htmlFor="gemini-key-input" className="config-label">
                       API Key
                       <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="config-label-link">Get free key →</a>
                     </label>
                     <input
+                      id="gemini-key-input"
                       type="password"
                       className={`config-input ${keyError ? 'has-error' : ''}`}
                       value={geminiKey}
                       onChange={e => { setGeminiKey(e.target.value); setKeyError(''); }}
                       placeholder="AIza..."
                       autoComplete="off"
+                      aria-label="Google Gemini API Key"
                     />
                     {keyError && <p className="config-error">{keyError}</p>}
                   </div>
                 </div>
               )}
-            </button>
+            </div>
 
             {/* Demo */}
-            <button
-              type="button"
+            <div
+              role="radio"
+              aria-checked={provider === 'demo'}
+              tabIndex={0}
               className={`provider-option ${provider === 'demo' ? 'is-selected' : ''}`}
               onClick={() => setProvider('demo')}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  setProvider('demo');
+                }
+              }}
               id="select-demo-btn"
+              aria-label="Instant Demo Sandbox AI Engine"
             >
               <div className="provider-option-header">
                 <span className="provider-icon">⚡</span>
@@ -254,7 +287,7 @@ export default function SetupScreen({ onComplete }) {
                   <div className={`radio-dot ${provider === 'demo' ? 'is-active' : ''}`} />
                 </div>
               </div>
-            </button>
+            </div>
           </div>
 
           {/* Launch CTA */}
